@@ -1,0 +1,7 @@
+__pycache__/**
+gameinfo.txt
+codewords.txt
+players.txt
+universes-*.txt
+masonries-*.txt
+.DS_Store
