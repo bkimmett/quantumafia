@@ -5,6 +5,9 @@ from sys import exit
 
 masonries_now = None
 
+def tab():
+	return "        " #8 spaces
+
 def plural(num):
 	return "s" if num != 1 else ""
 	
@@ -90,9 +93,9 @@ def print_masonry_count_diff():
 	if masonries_now_idx < len(masonries_now):
 		masonries_added += len(masonries_now) - masonries_now_idx
 	if args.daynight == 'day':
-		print(f'Last night, {"no" if masonries_added == 0 else masonries_added} masonries were created, and {"no" if masonries_removed == 0 else masonries_removed} masonries closed.')
+		print(f'Last night, {"no" if masonries_added == 0 else masonries_added} {"masonries were" if masonries_added != 1 else "masonry was"} created, and {"no" if masonries_removed == 0 else masonries_removed} {"masonries" if masonries_removed != 1 else "masonry"} closed.')
 	else:
-		print(f'Today, {"no" if masonries_removed == 0 else masonries_removed} masonries closed.')
+		print(f'Today, {"no" if masonries_removed == 0 else masonries_removed} {"masonries" if masonries_removed != 1 else "masonry"} closed.')
 		if masonries_added > 0:
 			print("WARNING: Some masonries were added during day phase? This makes no sense.")
 
@@ -100,6 +103,7 @@ def print_masonry_differences(player_idx, liveness_now, liveness_then):
 	global masonries_then, masonries_now, args
 	if masonries_now is None:
 		read_masonry_differences()
+	has_printed_anything = False
 	#masonry array format is [left player idx, right player idx, round#, [possible left entangler idxes], [possible right entangler idxes]]
 	#masonry arrays will be ordered, as well.
 	masonries_then_subset = [masonry for masonry in masonries_then if masonry[0] == player_idx or masonry[1] == player_idx]
@@ -119,16 +123,23 @@ def print_masonry_differences(player_idx, liveness_now, liveness_then):
 		else: #implies round_number_comparison < 0
 			#the 'then' masonry is older - it's closed.
 			masonries_removed = True
+			if not has_printed_anything:
+				print()
+				has_printed_anything = True
 			print_masonry_removed(masonries_then_subset[masonries_then_idx], player_idx, masonries_now_subset, masonries_then_subset, liveness_now, liveness_then)
 			masonries_then_idx += 1
 	if masonries_then_idx < len(masonries_then_subset):
 		masonries_removed = True
-		for masonry in masonries_then_subset[masonries_then_idx:]:	
+		if not has_printed_anything:
+			print()
+			has_printed_anything = True
+		for masonry in masonries_then_subset[masonries_then_idx:]:
 			print_masonry_removed(masonry, player_idx, masonries_now_subset, masonries_then_subset, liveness_now, liveness_then)
 	if masonries_now_idx < len(masonries_now_subset):
-		if masonries_removed:
+		if masonries_removed or not has_printed_anything:
 			print() #add line break
-		for masonry in masonries_now_subset[masonries_now_idx:]:	
+			has_printed_anything = True
+		for masonry in masonries_now_subset[masonries_now_idx:]:
 			print_masonry_added(masonry, player_idx)
 		
 	
@@ -164,14 +175,14 @@ def print_masonry_removed(masonry, player_idx, masonries_now_subset, masonries_t
 			reason = "**UNKNOWN REASON, MOD NEEDS TO FIGURE THIS OUT**"
 			#6. If we got here, ask for mod help.
 	### THIS WILL BE WRONG OCCASIONALLY!
-	print(f"Your masonry with {other_player} has collapsed - {reason}.")
+	print(f"**Your masonry with {other_player} has collapsed** - {reason}.")
 	
 
 def print_masonry_added(masonry, player_idx):
 	is_first_player = player_idx == masonry[0]
 	other_player = qm_shared.get_player_name(masonry[1] if is_first_player else masonry[0])
 	possible_entanglers = [qm_shared.get_player_name(item) for item in masonry[3]] if is_first_player else [qm_shared.get_player_name(item) for item in masonry[4]]
-	print(f'You have been pulled into a masonry with {other_player}, by {"one of " if len(possible_entanglers) > 1 else ""}{qm_shared.oxford_comma(possible_entanglers, "or")}.')
+	print(f'**You have been pulled into a masonry** with {other_player}, by {"one of " if len(possible_entanglers) > 1 else ""}{qm_shared.oxford_comma(possible_entanglers, "or")}.')
 		
 
 def print_codeword(player_idx):
@@ -210,6 +221,8 @@ def print_dms():
 		#no 'then' file if N0/D1
 		universe_then_filedesc = os.open(f"universes-{'N' if is_day else 'D'}{args.num - (1 if is_day else 0)}.txt", os.O_RDONLY)	#NOT the same as regular open()
 		universe_then_file = mmap.mmap(universe_then_filedesc, 0, access=mmap.ACCESS_READ)
+	else:
+		universe_then_file = None
 	
 	#further arg parsing will be required - but first, load game info
 	#also check if output files	
@@ -231,6 +244,10 @@ def print_dms():
 	player_liveness = [player_liveness_string[x*2:(x+1)*2] for x in range(num_players)]
 	num_universes = int(universe_now_file.readline().decode('utf-8').rstrip('\n'))
 	actions = universe_now_file.readline().decode('utf-8').rstrip('\n') #assume these are correct - were validated in night. Not used elsewhere.
+	
+	if is_day and args.num == 1 and has_entangler:
+		with open("actions-D1.txt", 'r') as actionfile:
+			actions = actionfile.readline().rstrip("\n") #read supplementary actions
 	
 	num_players_left = current_setup[0] #aliases
 	num_scum_left = current_setup[1]
@@ -272,11 +289,15 @@ def print_dms():
 		#parse player actions (same way as night.py. this could totally be more efficient but what-ever)
 		player_action_blocs = [st for st in actions.split(sep="-", maxsplit=num_players-1)]
 		
-		scum_index = 0
-		detective_index = scum_index + (1 if has_detective else 0)
-		entangler_index = detective_index + (1 if has_entangler else 0) 
-		follower_index = entangler_index + (1 if has_follower else 0) 
-		guard_index = follower_index + (1 if has_guard else 0) 
+		if not entangler_only:
+			scum_index = 0
+			detective_index = scum_index + (1 if has_detective else 0)
+			entangler_index = detective_index + (1 if has_entangler else 0) 
+			follower_index = entangler_index + (1 if has_follower else 0) 
+			guard_index = follower_index + (1 if has_guard else 0) 
+		else:
+			entangler_index = 0
+			
 		if not entangler_only:
 			nightkill_requests =  [qm_shared.player_to_pos(target) if target != '#' else None for target in (player_action[scum_index] if player_liveness_then[idx][1] == '#' else '#' for idx, player_action in enumerate(player_action_blocs))]
 		
@@ -309,7 +330,10 @@ def print_dms():
 		for _ in range(num_universes):
 			universe_now_block = qm_shared.parse_universe(universe_now_file.readline())
 			universe_now = universe_now_block[1]
-			universe_then = read_to_universe_with_id(universe_then_file, int(universe_now_block[0]))
+			if universe_then_file is not None:
+				universe_then = read_to_universe_with_id(universe_then_file, int(universe_now_block[0]))
+			else:
+				universe_then = universe_now #D1: no previous universe to go back to
 			
 			for player_idx in live_indexes:
 				#so unlike the night version, we need to track BOTH the role count AND the result.
@@ -474,13 +498,13 @@ def print_dms():
 					if entangler_requests[player_idx] is not None:
 						ent_target = qm_shared.get_player_name(entangler_requests[player_idx])
 						if entangler_results[player_idx]:
-							ent_result = f"you successfully pulled {ent_target} into a masonry!"
+							ent_result = f"**you successfully pulled {ent_target} into a masonry!**"
 						else:
-							ent_result = f"you tried to pull {ent_target} into a masonry, but failed."	
+							ent_result = f"**you tried to pull {ent_target} into a masonry**, but failed."	
 					else:
-						ent_result = "nothing happened."
+						ent_result = "**nothing happened.**"
 					
-					print(f"As the **entangler**, you are alive in {percent(player_counts[4], num_universes)} universe{plural(player_counts[4])}. Last night, {ent_result}")
+					print(f"As the **entangler**, you are alive in {percent(player_counts[4], num_universes)} universe{plural(player_counts[4])}.\n{tab()}Last night, {ent_result}")
 					
 				if player_counts[5] > 0: #follower
 					print(f"As the **follower**, you are alive in {percent(player_counts[5], num_universes)} universe{plural(player_counts[5])}.")		
@@ -510,9 +534,9 @@ def print_dms():
 						result = f"Last night, **you were fought off by the Guard** as you tried to kill **{nk_target}**."
 					if num_scum_left > 1:
 						other_scum_names = [qm_shared.get_player_name(idx) for idx, item in enumerate(player_liveness) if item[0] in 'ABC' and idx != player_idx]
-						print(f'You are **scum**, along with {qm_shared.oxford_comma(other_scum_names,"and")}. {result}')
+						print(f'You are **scum**, along with {qm_shared.oxford_comma(other_scum_names,"and")}.\n{tab()}{result}')
 					else:
-						print(f"You are **scum** - the last one left! {result}")
+						print(f"You are **scum** - the last one left!\n{tab()}{result}")
 					
 				elif player_counts[3] > 0:
 					det_results = player_results[1]
@@ -532,16 +556,16 @@ def print_dms():
 						result = "scum"
 					elif det_results[4] > 0:
 						result = "dead"
-					print(f"You are the **detective**. Upon investigating **{det_target}**, you determined they are **{result}**.")
+					print(f"You are the **detective**.\n{tab()}Upon investigating **{det_target}**, you determined they are **{result}**.")
 				elif player_counts[4] > 0:
 					#result is different based on if it was possible for an entangler request submit last night.
 					
 					if liveness_then[player_idx][0] != 'E':
 						ent_target = qm_shared.get_player_name(entangler_requests[player_idx])
-						result = f"Last night, you tried to pull **{ent_target}** into a masonry, but **every other universe but this one collapsed**, halting the process."
+						result = f"Last night, you tried to pull {ent_target} into a masonry, but **every other universe but this one collapsed**, halting the process."
 					else:
 						result = "Nothing happened last night."
-					print(f"You are the **entangler**. {result}")
+					print(f"You are the **entangler**.\n{tab()}{result}")
 				elif player_counts[5] > 0 or can_have_been_follower[player_idx] == True:
 					follower_target = qm_shared.get_player_name(follower_requests[player_idx])
 					if len(follower_results[player_idx]) > 0:
@@ -550,7 +574,7 @@ def print_dms():
 					else:
 						follower_result = f"**No one visited {follower_target} last night**, in any surviving universe."
 					if player_counts[5] > 0:
-						print(f"You are the **follower**. {result}")
+						print(f"You are the **follower**.\n{tab()}{result}")
 				elif player_counts[6] > 0:
 					guard_results = player_counts[2]
 					guard_target = qm_shared.get_player_name(guard_requests[player_idx])
@@ -560,13 +584,14 @@ def print_dms():
 						result = f"You guarded {guard_target} last night - and **fought off someone trying to kill them!**"
 					elif guard_results[2] > 0: #already dead
 						result = f"You tried to guard {guard_target} last night, but it turned out **they were dead before the night began**."
-					print(f"You are the **guard**. {result}")
+					print(f"You are the **guard**.\n{tab()}{result}")
 				elif player_counts[7] > 0:
 					print("You are **vanilla town**.")
 				if player_counts[5] == 0 and can_have_been_follower[player_idx] == True:
 					#TODO by the way, you WERE the follower, and...	
+					print()
 					print("By the way: you _were_ the **follower** in at least one universe at the start of the night. So, here are your results:")
-					print(follower_result)
+					print(tab()+follower_result)
 			else:
 				if num_universes_disappeared > 0:
 					print(f"Last night, {num_universes_disappeared} universes collapsed. In the other {num_universes}:")
@@ -585,7 +610,7 @@ def print_dms():
 				else:
 					dead_now = "You did not die in any universe last night."
 					if player_counts[1] > 0:
-						dead_now += f"You were already dead in {percent(player_counts[1], num_universes)} universe{plural(player_counts[1])} before the night began."
+						dead_now += f" You were already dead in {percent(player_counts[1], num_universes)} universe{plural(player_counts[1])} before the night began."
 				#display dead
 				print(dead_now)
 				
@@ -620,7 +645,7 @@ def print_dms():
 								scum_outcome += f"you tried to kill {nk_target} in {player_results[0][2]} of them, but were fought off by the guard."
 							if player_results[0][1] > 0:
 								scum_outcome += f' {nk_target} was already dead when you got there in {player_results[0][1]}{" more" if num_results < 3 else ""} universe{plural(player_results[0][1])}.'
-						print(scum_outcome)
+						print(tab()+scum_outcome)
 						
 						#you successfully killed {}. #//say # of universes
 						#you tried to kill {}, but were fought off by the guard. #//say # of universes
@@ -633,29 +658,29 @@ def print_dms():
 				if player_counts[3] > 0: #detective
 					det_target = qm_shared.get_player_name(detective_requests[player_idx])
 					#As the Detective, you investigated # (and are alive) in # universes (#%). They are town-aligned in # of them, and hold a town-aligned power role in [# / none] of those. They are the Entangler in # universes where you are alive, and scum 
-					detective_result = f"As the **detective**, you investigated {det_target} (and are alive) in {percent(player_counts[3], num_universes)} universe{plural(player_counts[3])}. "
+					detective_result = f"As the **detective**, you investigated {det_target} (and are alive) in {percent(player_counts[3], num_universes)} universe{plural(player_counts[3])}."
 					num_results = len([x for x in player_results[1] if x > 0]) 
 					
 					if num_results == 1 or (num_results == 2 and player_results[1][0] > 0 and player_results[1][1] == player_results[1][0]):
 						#only one outcome, simple messages (also handles case where there is only one universe left)
 						multiple_universes =  not (sum(player_results[1]) - player_results[1][1] == 1)
 						if player_results[1][4] > 0: #dead
-							detective_result += f'However, they are dead in {"each of those" if multiple_universes else "that"} universe{"s" if multiple_universes else ""}.'
+							detective_result += f'\n{tab()}However, they are dead in {"each of those" if multiple_universes else "that"} universe{"s" if multiple_universes else ""}.'
 						else:
 							if player_results[1][1] > 0: #town power
 								if not has_follower_right_now:
-									role = "a town power role (i.e. the guard)"
+									role = "a town power role (i.e. the **guard**)"
 								elif not has_guard_right_now:
-									role = "a town power role (i.e. the follower)"
+									role = "a town power role (i.e. the **follower**)"
 								else:
-									role = "a town power role (the follower or guard)"
+									role = "a town power role (the **follower or guard**)"
 							elif player_results[1][0] > 0: #town (vanilla)
-								role = "vanilla town"
+								role = "**vanilla town**"
 							elif player_results[1][2] > 0: #entangler
-								role = "the entangler"
+								role = "the **entangler**"
 							elif player_results[1][3] > 0: #scum
-								role = "scum"
-							detective_result += f'They are {role} in {"each" if multiple_universes else "that"} universe.'
+								role = "**scum**"
+							detective_result += f'\n{tab()}They are {role} in {"each" if multiple_universes else "that"} universe.'
 					else:
 						if not has_follower_right_now:
 							role = "i.e. the guard"
@@ -663,7 +688,7 @@ def print_dms():
 							role = "i.e. the follower"
 						else:
 							role = "the follower or guard"
-						detective_result += "They {}.".format(and_or_all(player_results[1], ["are town-aligned", "hold a town power role ({})".format(role), "are the entangler", "are scum", "are dead"]))
+						detective_result += "\n{tab()}They {}.".format(and_or_all(player_results[1], ["are town-aligned", "hold a town power role ({})".format(role), "are the entangler", "are scum", "are dead"]))
 	
 					print(detective_result)
 				elif has_detective_right_now:
@@ -675,15 +700,15 @@ def print_dms():
 					if player_counts[4] == num_universes:
 						#only one entangler - can't submit.
 						if liveness_then[player_idx][0] != 'E':
-							print(f"As the **entangler**, you are alive in {player_counts[4]} universes - that's every universe. Last night, you tried to pull **{ent_target}** into a masonry, but **every universe with a different entangler collapsed**. Sorry!")
+							print(f"As the **entangler**, you are alive in {player_counts[4]} universes - that's every universe.\n{tab()}Last night, you tried to pull **{ent_target}** into a masonry, but **every universe with a different entangler collapsed**. Sorry!")
 						else: 
-							print(f"As the **entangler**, you are alive in {player_counts[4]} universes - that's every universe. Nothing happened last night.")
+							print(f"As the **entangler**, you are alive in {player_counts[4]} universes - that's every universe.\n{tab()}Nothing happened last night.")
 					else:
 						if entangler_results[player_idx]:
-							ent_result = f"successfully pulled {ent_target} into a masonry!"
+							ent_result = f"**successfully pulled {ent_target} into a masonry!**"
 						else:
-							ent_result = f"tried to pull {ent_target} into a masonry, but failed."
-						print(f"As the **entangler**, you are alive in {percent(player_counts[4], num_universes)} universe{plural(player_counts[4])}. Last night, you {ent_result}")
+							ent_result = f"**tried to pull {ent_target} into a masonry**, but failed."
+						print(f"As the **entangler**, you are alive in {percent(player_counts[4], num_universes)} universe{plural(player_counts[4])}.\n{tab()}Last night, you {ent_result}")
 				elif has_entangler_right_now:
 					print("You are not alive as the entangler in any universe.")
 
@@ -696,16 +721,16 @@ def print_dms():
 						follower_result = f"**No one visited {follower_target} last night**, in any surviving universe."
 					
 				if player_counts[5] > 0: #follower
-					print(f"As the **follower**, you are alive in {percent(player_counts[5], num_universes)} universe{plural(player_counts[5])}. {follower_result}")		
+					print(f"As the **follower**, you are alive in {percent(player_counts[5], num_universes)} universe{plural(player_counts[5])}.\n{tab()}{follower_result}")		
 				elif has_follower_right_now:
 					if can_have_been_follower[player_idx]:
-						print("You are not alive as the **follower** in any universe... but you _were_ last night, so you get those results anyway. {follower_result}")
+						print("You are not alive as the **follower** in any universe... but you _were_ last night, so you get those results anyway.\n{tab()}{follower_result}")
 					else:
 						print("You are not alive as the follower in any universe.")
 					
 				if player_counts[6] > 0: #guard
 					guard_target = qm_shared.get_player_name(guard_requests[player_idx])
-					guard_result = f'As the **guard**, you protected {guard_target} (and are alive) in {percent(player_counts[6], num_universes)} universe{plural(player_counts[6])}. '
+					guard_result = f'As the **guard**, you protected {guard_target} (and are alive) in {percent(player_counts[6], num_universes)} universe{plural(player_counts[6])}.\n{tab()}'
 					num_results = len([x for x in player_results[2] if x > 0]) 
 					multiple_universes = sum(player_results[2]) > 1
 					
@@ -873,6 +898,7 @@ def print_dms():
 			
 			#either way, now handle masonries
 			if has_entangler_right_now and args.num > 0:
+				print()
 				print_masonry_differences(player_idx, player_liveness, player_liveness_then)
 			
 			print()
@@ -935,8 +961,12 @@ def print_dms():
 		else:
 			print('{}   {}{}{}{}{}'.format(qm_shared.get_player_codeword(player_idx), *aggregated_counts[player_idx]))
 			
+			
+			
 	if args.num > 0:
 		print()	
+	print(f'{num_universes} universe{"s" if num_universes > 1 else ""} remain{"" if num_universes > 1 else "s"}.')	
+	if args.num > 0:
 		print_masonry_count_diff()
 	
 	#AND WE ARE DONE.

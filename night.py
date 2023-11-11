@@ -63,6 +63,10 @@ def night():
 		print(f"The universe file I'd have to write to, universes-D{args.night+1}.txt, already exists. Delete the old file if you want me to overwrite it.")
 		exit()
 	
+	if entangler_only and exists("actions-D1.txt"):
+		print(f"The supplementary actions file I'd have to write to, actions-D1.txt, already exists. Delete the old file if you want me to overwrite it.")
+		exit()
+	
 	#now time to parse arguments properly.
 	
 	if not all(ord(char) == 35 or ord(char) == 45 or (char.isalpha() and char.isascii()) for char in args.actions):
@@ -151,11 +155,11 @@ def night():
 	if not entangler_only:
 	
 		universe_file = qm_shared.get_universe_file(args.night, False) #should return existing file pointer
-		if universe_file.tell() == 0:
-			print("WARNING: did we reopen the universe file??")
-			universe_file.readline() #skip 3 lines to get to actual universes
-			universe_file.readline()
-			universe_file.readline()
+		universe_file.seek(0)
+		universe_file.readline() #skip 3 lines to get to actual universes
+		universe_file.readline()
+		universe_file.readline()
+		universe_file.readline()
 	
 		target_checking = []
 		targets_to_check = 0
@@ -319,11 +323,10 @@ def night():
 	
 		#so now we've done steps 1-3. Now we check for deadness and flip if need be. This is done by [S] Cascade.
 		updated_liveness = qm_shared.cascade(output_buffer, player_liveness)
-		qm_shared.close_universe_file()
-	
 	
 		#we will also need to update liveness again for 100% roles.
 		updated_liveness = qm_shared.transform_liveness_roles(output_buffer, updated_liveness)
+		qm_shared.close_universe_file()
 	
 		#we also need to update current_setup.
 		# num_players_left = current_setup[0] #aliases
@@ -359,7 +362,7 @@ def night():
 		#for a scum victory to be declared, if N scum survive, there must be at most N-1 other players - in every surviving universe.
 		#we do not need to check for a draw or town victory at night, as scum can't die here, and both of those conditions occur when the last scum dies. (this works because nothing can stop a vote so scum are never alive in some universes as scum and dead in others as scum)
 	
-		qm_shared.check_scum_victory(output_buffer)
+		qm_shared.check_scum_victory(output_buffer, num_scum_left)
 		#possible cases: 
 			#all scum determinate: "The surviving scum players, #, #, and #, have won.
 			#most scum determinate 1 indeterminate 
@@ -505,6 +508,13 @@ def night():
 	if not entangler_only:
 		print(f"Writing {len(output_buffer)} universe(s) to universe file...")
 		qm_shared.write_universe_file(output_buffer,  f"universes-D{args.night+1}.txt", player_liveness, current_setup, args.actions)
+	else:
+		print(f"Writing supplementary actions file.")
+		with open("actions-D1.txt", 'x') as actionfile:
+			actionfile.write(args.actions)
+		
+		
+		
 		
 		
 	print("All done!")	

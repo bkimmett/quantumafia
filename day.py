@@ -11,7 +11,7 @@ def day():
 						description='This processes the end-of-day transition in a match of Quantumafia.')
 					
 	parser.add_argument('day', type=int, help="Indicates which game day (1, 2, 3...) is to be transitioned.")
-	parser.add_argument('vote', help="One or more letters, from A, B, C... which indicates which player was voted out. Separate successive letters by spaces if more than one. If more than one player is supplied one of them will be picked randomly." nargs='+' type=qm_shared.single_letter)
+	parser.add_argument('vote', help="One or more letters, from A, B, C... which indicates which player was voted out. Separate successive letters by spaces if more than one. If more than one player is supplied one of them will be picked randomly.", nargs='+', type=qm_shared.single_letter)
 	args = parser.parse_args()
 
 	#this block is the same as night's block
@@ -51,15 +51,21 @@ def day():
 	else:
 		vote = args.vote[0]
 		
-		
-	print(f"Voting out {player_names[vote]}.")
 	vote = qm_shared.player_to_pos(vote)
+	print(f"Voting out {player_names[vote]}.")
 	
 	output_buffer = []
 	entangler_subsidiary_buffer = []
 	vote_hit_nonentangler_in_some_universe = False
 
 	universes_collapsed = [0, 0] #already dead, vote entangler
+	
+	universe_file = qm_shared.get_universe_file(args.day, True)
+	universe_file.seek(0)
+	universe_file.readline()
+	universe_file.readline()
+	universe_file.readline()
+	universe_file.readline() #skip header
 
 	#track scum action
 	for _ in range(num_universes):
@@ -79,7 +85,7 @@ def day():
 			if not vote_hit_nonentangler_in_some_universe:
 				entangler_subsidiary_buffer.append([universe_chunk[0],universe_to_transform])
 			else:
-				universes_collapsed[0] += 1
+				universes_collapsed[1] += 1
 				continue
 		elif voted_player_role in 'ABCDFGT':
 			vote_hit_nonentangler_in_some_universe = True	
@@ -99,14 +105,14 @@ def day():
 		universes_collapsed[1] += len(entangler_subsidiary_buffer)
 	del entangler_subsidiary_buffer #maybe reclaim memory space
 
-	print("Voting phase complete. {} universes collapsed in the phase ({} target already dead, {} entangler ).".format(sum(universes_collapsed),*universes_collapsed))
+	print("Voting phase complete. {} universes collapsed in the phase ({} target already dead, {} target was entangler).".format(sum(universes_collapsed),*universes_collapsed))
 		
 		
 	#update liveness and state, and cascade. pretty much the same as for Night.
 	
-	updated_liveness = qm_shared.cascade(output_buffer, player_liveness)
-	qm_shared.close_universe_file()
+	updated_liveness = qm_shared.cascade(output_buffer, player_liveness, voted_player_id=vote)
 	updated_liveness = qm_shared.transform_liveness_roles(output_buffer, updated_liveness)
+	qm_shared.close_universe_file()
 
 	#we also need to update current_setup.
 	new_setup = [0, num_scum, has_detective_right_now, has_entangler_right_now, has_follower_right_now, has_guard_right_now]
@@ -178,7 +184,7 @@ def day():
 			exit()
 	else:
 		#check for scum victory (if scum didn't die, we can't have a TOWN victory or DRAW because one scum is still alive.)
-		qm_shared.check_scum_victory(output_buffer) #may exit
+		qm_shared.check_scum_victory(output_buffer, num_scum_left) #may exit
 		
 	#now maybe promote scum	
 	for universe in output_buffer:
@@ -210,7 +216,7 @@ def day():
 		qm_shared.write_masonry_file(existing_masonries, f"masonries-N{args.day}.txt")
 		
 	#now, write output universes
-	qm_shared.write_universe_file(output_buffer,  f"universes-N{args.day}.txt", updated_liveness, new_setup, "")
+	qm_shared.write_universe_file(output_buffer,  f"universes-N{args.day}.txt", updated_liveness, new_setup, qm_shared.pos_to_player(vote))
 	
 	print("All done!")	
 	print(f"*** NEXT (after sending DMs): RUN NIGHT.PY FOR NIGHT {args.day} ***")

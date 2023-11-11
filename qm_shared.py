@@ -84,7 +84,7 @@ def read_player_names():
 	global orig_setup, player_names
 	try:
 		with open("players.txt", 'r') as players:
-			player_names = [players.readline().rstrip('\n') for _ in range(orig_setup[0])]
+			player_names = [players.readline().rstrip('\n')[3:] for _ in range(orig_setup[0])]
 			return player_names
 		
 	except OSError:
@@ -123,6 +123,8 @@ def get_universe_file(day_num, is_day, switch=False):
 	if universe_file is None:
 		universe_filedesc = os.open(f"universes-{'D' if is_day else 'N'}{day_num}.txt", os.O_RDONLY)	#NOT the same as regular open()
 		universe_file = mmap.mmap(universe_filedesc, 0, access=mmap.ACCESS_READ)
+		universe_file_num = day_num
+		universe_file_is_day = is_day
 	return universe_file	
 
 def close_universe_file():
@@ -142,7 +144,7 @@ def get_universe_file_metrics():
 	universe_file.readline()
 	universe_records_start = universe_file.tell()
 	single_universe = universe_file.readline().decode('utf-8').rstrip("\n")
-	universe_line_chars = len(single_universe)
+	universe_line_chars = len(single_universe) + 1 #include length of newline
 	universe_num_digits = len(single_universe.split(sep="-", maxsplit=1)[0])
 	
 def read_masonry_file(filename):
@@ -157,9 +159,9 @@ def read_masonry_file(filename):
 				break #all done!
 
 			masonry_string_list = masonry_string.split(sep="-", maxsplit=3)
-			unpacked_masonry = (*(qm_shared.player_to_pos(item) for item in masonry_string_list[0]), int(masonry_string_list[1]), [qm_shared.player_to_pos(item) for item in masonry_string_list[2]], [qm_shared.player_to_pos(item) for item in masonry_string_list[3]])
+			unpacked_masonry = [*(player_to_pos(item) for item in masonry_string_list[0]), int(masonry_string_list[1]), [player_to_pos(item) for item in masonry_string_list[2]], [player_to_pos(item) for item in masonry_string_list[3]]]
 			existing_masonries.append(unpacked_masonry)	
-			return existing_masonries
+		return existing_masonries
 	
 def write_masonry_file(masonries, filename):
 	if not current_setup[3]: #has_entangler_right_now
@@ -192,7 +194,7 @@ def write_universe_file(universes, filename, liveness, setup, actions):
 				actions
 				))
 				
-			packed_universes = (universe_format.format(universe[0],universe[1]) for universe in universes)
+			packed_universes = (universe_format.format(universe[0],"".join(universe[1])) for universe in universes)
 			write_lines_to_file(output_universes, packed_universes)
 	
 	except FileExistsError:
@@ -229,16 +231,16 @@ def compare_livenesses(universe_buffer, original_liveness):
 				current_livenesses[this_idx] = True			
 		if all(current_livenesses): #end early if everyone is still alive somewhere
 			break
-
+			
 	return current_livenesses
 	
 def transform_liveness_roles(universe_buffer, incoming_liveness): #this fn updates the roles so that if any player has a specific, guaranteed role, that is listed in the global liveness as a shortcut
-	updated_livenesses = liveness[:] #make a copy
+	updated_livenesses = incoming_liveness[:] #make a copy
 	needs_checking = [item[0] == '#' for item in incoming_liveness] #role
-	check_results = [None for _ in needs_checking]
+	check_results = [None for item in incoming_liveness]
 
 	for universe_chunk in universe_buffer:
-		for this_idx in (idx for idx, needs_checking in enumerate(updated_livenesses) if needs_checking): #only check players who we're not sure about
+		for this_idx in (idx for idx, check_this_player in enumerate(needs_checking) if check_this_player): #only check players who we're not sure about
 			role = universe_chunk[1][this_idx]
 			if role in 'ABC':
 				role = 'A' #normalize mafia roles
@@ -252,10 +254,10 @@ def transform_liveness_roles(universe_buffer, incoming_liveness): #this fn updat
 		if not any(needs_checking): #end early if everyone who needs checking is indeterminate
 			break
 
-	for player_id, state in check_results:
+	for player_id, state in enumerate(check_results):
 		if state is not None:
-			assert updated_livenesses[player_id] == state or updated_livenesses[player_id] == '#'
-			updated_livenesses[player_id] = state
+			assert updated_livenesses[player_id][0] == state or updated_livenesses[player_id][0] == '#'
+			updated_livenesses[player_id] = f"{state}{updated_livenesses[player_id][1]}"
 
 	return updated_livenesses
 
@@ -297,15 +299,15 @@ def get_can_entangle(liveness, universes):
 	for idx, item in enumerate(can_entangle_results):
 		if item is None:
 			can_entangle_results[idx] = False #if we didn't find an entangler record for this player after scanning all universes, mark it as false
-	
+	return can_entangle_results
 	
 # [S] Cascade.
 def cascade(universe_buffer, incoming_player_livenesses, voted_player_id=None): #expects regular liveness format, not t/f
 	#this fn takes the universe buffer and pre-calculated liveness state. It determines if anyone is now 100% dead (voted out or NKed), and if so, flips them, comparing with day 1 universe if necessary. We use a classical for loop rather than for..in to allow mutating the universe buffer directly. (This is normally bad practice but I don't have another spare 8 GB of memory.)
-
+	
+	current_liveness = incoming_player_livenesses[:]
+	
 	while len(universe_buffer) > 0: 
-		current_liveness = incoming_player_livenesses[:]
-
 		liveness_result = compare_livenesses(universe_buffer, current_liveness)
 	
 		if all(liveness_result):
@@ -355,6 +357,7 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 	#in the first pass, we just assess the player's state in the still living universes.
 	for idx, universe in enumerate(universe_buffer):
 		player_role_in_that_universe = get_player_role_in_orig_universe(player_id, int(universe[0]))
+		#print(f"Player is {player_role_in_that_universe} in universe {int(universe[0])}.") #debug
 		
 		if player_role_in_that_universe == 'E':
 			entangler_seen = True
@@ -390,13 +393,13 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 		assert len(follower_universe_idxs) == 0
 		assert len(guard_universe_idxs) == 0
 		print("No universes have collapsed.")
-		current_liveness[player_id][0] = 'E'
-		current_liveness[player_id][1] = 'V' if is_vote else 'X'
+		current_liveness[player_id] = f"E{'V' if is_vote else 'X'}"
 		return #no mutation needed, no collapses from this event
 	elif entangler_seen:
 		#pick a random choice from the combined list of all the non-entangler universes.
 		chosen_universe_idx = random_source.choice([*town_universe_idxs, *scum_universe_idxs, *det_universe_idxs, *follower_universe_idxs, *guard_universe_idxs])
-		chosen_universe_id = int(universe_buffer[chosen_index][0])
+		chosen_universe_id = int(universe_buffer[chosen_universe_idx][0])
+		print(f"Chosen universe = {universe_buffer[chosen_universe_idx]}")
 	else:
 		#easy way to do it
 		#we could probably just do this a few times at the start and it'd serve for most cases, but whatever. we spend an extra rng flip that way
@@ -405,32 +408,38 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 	
 	universe_idxes_to_remove = [*ent_universe_idxs] #if we got this far, the flip is not the entangler, so remove any universes where the player was the entangler
 	
-	current_liveness[player_id][0] = final_player_role
-	current_liveness[player_id][1] = 'V' if is_vote else 'X'
+	print(f"Added {len(ent_universe_idxs)} entangler indexes to remove list")
+	
+	current_liveness[player_id] = f"{final_player_role}{'V' if is_vote else 'X'}"
 	
 	if final_player_role == 'T':
 		print(f"{get_player_name(player_id)} was TOWN.")
 	else:
+		print(f"Added {len(town_universe_idxs)} town indexes to remove list")
 		universe_idxes_to_remove.extend(town_universe_idxs)
 	
-	if final_player_role == 'ABC':
+	if final_player_role in 'ABC':
 		print(f"{get_player_name(player_id)} was SCUM.")
 	else:
+		print(f"Added {len(scum_universe_idxs)} scum indexes to remove list")
 		universe_idxes_to_remove.extend(scum_universe_idxs)
 		
 	if final_player_role == 'D':
 		print(f"{get_player_name(player_id)} was the DETECTIVE.")
 	else:
+		print(f"Added {len(det_universe_idxs)} det indexes to remove list")
 		universe_idxes_to_remove.extend(det_universe_idxs)
 		
 	if final_player_role == 'F':
 		print(f"{get_player_name(player_id)} was the FOLLOWER.")
 	else:
+		print(f"Added {len(follower_universe_idxs)} follower indexes to remove list")
 		universe_idxes_to_remove.extend(follower_universe_idxs)
 		
 	if final_player_role == 'G':
 		print(f"{get_player_name(player_id)} was the GUARD.")
 	else:
+		print(f"Added {len(guard_universe_idxs)} follower indexes to remove list")
 		universe_idxes_to_remove.extend(guard_universe_idxs)
 		
 	universe_idxes_to_remove.sort(reverse=True)
@@ -444,7 +453,7 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 		#this should be impossible, but we check anyway
 		paradox(f"flip of {get_player_name(player_id)}") #will exit
 	
-def check_scum_victory(universe_buffer):
+def check_scum_victory(universe_buffer, num_scum_left):
 	global player_liveness
 	indeterminate_universe_found = False
 	always_scum = [True for _ in player_liveness]

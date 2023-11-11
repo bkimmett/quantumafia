@@ -59,7 +59,7 @@ def setup():
 				for num in range(num_players):
 					playerlist.write("{}: PLAYER{}_NAME\n".format(player_marker(num),num+1))
 					codewordlist.write("CWORD{}\n".format(num+1))
-				playerlist.write("\nThe first player in the list will be referred to as 'A' in universe files and command line commands. The second player in the list will be referred to as 'B', the third will be referred to as 'C', and so on.")
+				playerlist.write("\nThe first player in the list will be referred to as 'A' in universe files and command line commands. The second player in the list will be referred to as 'B', the third will be referred to as 'C', and so on.\nNote: Don't remove the 'A: ', 'B: '... prefixes (including the spaces) from the lines. QM will remove those  automatically.")
 		
 	except FileExistsError:
 		print("Error - one or more of [A] the player list file, players.txt, [B] the codeword list file, codewords.txt, or [C] the game setup file, gameinfo.txt, already exist. I won't overwrite these files, in case you have a game in progress. If you want to start a new game, delete these files then try running setup again.")
