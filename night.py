@@ -88,7 +88,7 @@ def night():
 		exit()
 	
 	player_action_blocs = [st for st in aa_upper.split(sep="-", maxsplit=num_players-1)]
-	expected_bloc_len = 1 if args.night == 0 else 1 + sum([1 if item else 0 for item in game_setup[2:]])
+	expected_bloc_len = 1 if args.night == 0 else 1 + sum([1 if item else 0 for item in current_setup[2:]])
 	
 	if len(player_action_blocs) < num_players:
 		print("I need an action block for each player, even dead ones. If a player is voted out of the game, their block can just be '#'.")
@@ -104,16 +104,16 @@ def night():
 		else:
 			error += f"Each must be {expected_bloc_len} characters long, corresponding to their "
 			verbs = ["nightkill"]
-			if has_detective:
+			if has_detective_right_now:
 				verbs.append("investigation")
-			if has_entangler:
+			if has_entangler_right_now:
 				verbs.append("entanglement")
-			if has_follower:
+			if has_follower_right_now:
 				verbs.append("watch")
-			if has_detective:
+			if has_guard_right_now:
 				verbs.append("protect")
 			error += f'{qm_shared.oxford_comma(verbs, "and")}. '
-		error += "If a player is guaranteed not to be able to use a role, you can  set that role's target letter to '#'."
+		error += "If a player is guaranteed not to be able to use a role, you can set that role's target letter to '#'."
 		print(error)
 		exit()
 	
@@ -123,10 +123,10 @@ def night():
 		entangler_index = 0
 	else:
 		scum_index = 0
-		detective_index = scum_index + (1 if has_detective else 0)
-		entangler_index = detective_index + (1 if has_entangler else 0) 
-		follower_index = entangler_index + (1 if has_follower else 0) 
-		guard_index = follower_index + (1 if has_guard else 0) 
+		detective_index = scum_index + (1 if has_detective_right_now else 0)
+		entangler_index = detective_index + (1 if has_entangler_right_now else 0) 
+		follower_index = entangler_index + (1 if has_follower_right_now else 0) 
+		guard_index = follower_index + (1 if has_guard_right_now else 0) 
 		nightkill_requests =  [player_action[scum_index] if player_liveness[idx][1] == '#' else '#' for idx, player_action in enumerate(player_action_blocs)]
 		
 		if has_detective_right_now:
@@ -156,7 +156,7 @@ def night():
 	
 		universe_file = qm_shared.get_universe_file(args.night, False) #should return existing file pointer
 		universe_file.seek(0)
-		universe_file.readline() #skip 3 lines to get to actual universes
+		universe_file.readline() #skip 4 lines to get to actual universes
 		universe_file.readline()
 		universe_file.readline()
 		universe_file.readline()
@@ -185,7 +185,6 @@ def night():
 				break
 		
 			next_universe = qm_shared.parse_universe(universe_file.readline())[1] #get second half of universe - the part with the letters	
-		
 			#check scum
 			thisuni_scum_index = next_universe.index('A')
 			if 'A' in target_checking[thisuni_scum_index]:
@@ -193,14 +192,14 @@ def night():
 				if next_universe[qm_shared.player_to_pos(target_checking[thisuni_scum_index]['A'])] not in 'XV': #i.e. if not dead, or voted out...
 					del target_checking[thisuni_scum_index]['A']
 					targets_to_check -= 1
-			if has_detective_right_now:
+			if has_detective_right_now and 'D' in next_universe:
 				thisuni_det_index = next_universe.index('D')
 				if 'D' in target_checking[thisuni_det_index]:
 					#find det target
 					if next_universe[qm_shared.player_to_pos(target_checking[thisuni_det_index]['D'])] not in 'XV':
 						del target_checking[thisuni_det_index]['D']
 						targets_to_check -= 1
-			if has_guard_right_now:
+			if has_guard_right_now and 'G' in next_universe:
 				thisuni_guard_index = next_universe.index('G')
 				if 'G' in target_checking[thisuni_guard_index]:
 					#find guard target
@@ -212,8 +211,8 @@ def night():
 		if targets_to_check > 0:
 			print("Uh-oh. Some players are targeting other players who are dead in every universe where the first player holds a role. They are:")
 			for idx, player_targets in enumerate(target_checking):
-				for (key, value) in player_targets:
-					print(f"{player_names[idx]} {('nightkilling' if key == 'A' else ('investigating' if key == 'D' else ('guarding' if key == 'G' else 'ERROR!!!!!')))} {player_names[qm_shared.player_to_pos(value)]}")
+				for (key, value) in player_targets.items():
+					print(f"{player_names[idx]} {('nightkilling' if key == 'A' else ('investigating' if key == 'D' else ('guarding' if key == 'G' else 'ERROR!!!!!')))} {player_names[qm_shared.player_to_pos(value)]}.")
 			exit()
 		
 		else:
@@ -261,13 +260,13 @@ def night():
 			guard_blocking_nk = False
 			guard_blocking_det = False
 		
-			if has_guard_right_now:
+			if has_guard_right_now and 'G' in universe:
 				thisuni_guard_index = universe.index('G')
 				guard_target_index = qm_shared.player_to_pos(player_action_blocs[thisuni_guard_index][guard_index])
 				if scum_target_index ==  guard_target_index:
 					guard_blocking_nk = True
 		
-			if has_det_right_now:
+			if has_detective_right_now and 'D' in universe:
 				thisuni_det_index = universe.index('D')
 				det_target_index = qm_shared.player_to_pos(player_action_blocs[thisuni_det_index][detective_index])
 				if guard_target_index ==  det_target_index:
@@ -275,6 +274,7 @@ def night():
 
 			if scum_target_role in 'DFGTX': #we are assuming the guard cannot guard themself in the overall game rules, but we don't check for it anywhere in this program. You'll need to filter for it before entering actions into this program.
 				if guard_blocking_det and (scum_target_role != 'D' or guard_blocking_nk): #that is, if the detective is able to investigate while the guard blocks them, and the detective was not nightkilled...
+					#print(f"Universe {universe_chunk} collapses as detective meets guard.") #debug
 					universes_collapsed[2] += 1
 					continue #...then the universe collapses and we mulligan
 				
@@ -286,6 +286,7 @@ def night():
 	
 			if scum_target_role == 'E':
 				if guard_blocking_det: #the investigation will always start because scum didn't nk the detective
+					#print(f"Universe {universe_chunk} collapses as detective meets guard. (E)") #debug
 					universes_collapsed[2] += 1
 					continue #this universe collapses, never mind
 				elif guard_blocking_nk:
@@ -296,10 +297,12 @@ def night():
 					universe_to_transform[scum_target_index] = 'X' #mark nightkill (exigent)
 					entangler_subsidiary_buffer.append([universe_chunk[0],universe_to_transform])
 				else:
+					#print(f"Universe {universe_chunk} collapses as nightkill hits entangler.") #debug
 					universes_collapsed[1] += 1
 				continue
 		
 			if scum_target_role in 'ABC': #scum targeting other scum - impossible - universe collapses - guard targeting does _not_ affect this because mafia couldn't target other mafia in the first place
+				#print(f"Universe {universe_chunk} collapses as scum targets other scum.") #debug - this happens before the other collapse notifs
 				universes_collapsed[0] += 1
 				continue	
 			
@@ -323,7 +326,7 @@ def night():
 	
 		#so now we've done steps 1-3. Now we check for deadness and flip if need be. This is done by [S] Cascade.
 		updated_liveness = qm_shared.cascade(output_buffer, player_liveness)
-	
+
 		#we will also need to update liveness again for 100% roles.
 		updated_liveness = qm_shared.transform_liveness_roles(output_buffer, updated_liveness)
 		qm_shared.close_universe_file()
@@ -414,8 +417,10 @@ def night():
 		#OK, all done. Now we sort the list.
 		entangler_request_list = [x for x in entangler_request_list if x[0] and len(x[2]) > 0] #remove invalid option
 		entangler_request_list.sort(key=cmp_to_key(compare_masonry_objects))
+		max_masonries = min(len(entangler_request_list) // 2, 2)
 		
-		print(f"Creating up to {min(len(entangler_request_list) // 2, 2)} masonries with {len(entangler_request_list)} entangler requests, {len(entangler_request_list)} players requested.")
+		print(f"Creating up to {max_masonries} {'masonries' if max_masonries != 1 else 'masonry'}- with {len(entangler_request_list)} entangler requests, {len(entangler_request_list)} players requested.")
+		print(entangler_request_list)
 		
 		masonries_made = 0
 		all_done = False

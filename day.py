@@ -176,7 +176,7 @@ def day():
 			min_variable_living_players = min_living_players - len(always_alive_indexes)
 			max_variable_living_players = max_living_players - len(always_alive_indexes)
 			always_alive_names = [get_player_name(idx) for idx in always_scum_indexes]
-			sometimes_alive_names = [get_player_name(idx) for idx in always_scum_indexes]
+			sometimes_alive_names = [get_player_name(idx) for idx in sometimes_scum_indexes]
 			if max_variable_living_players == 0:
 				print(f'The surviving town player{"s" if num_players_left > 1 else ""}, {qm_shared.oxford_comma(always_alive_names, "and")}, {"have" if num_players_left > 1 else "has"} won.')
 			else:		

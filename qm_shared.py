@@ -205,7 +205,7 @@ def write_universe_file(universes, filename, liveness, setup, actions):
 def write_final_universe_file(universes, filename):
 	try:
 		with open(filename, 'x') as output_universes:
-			packed_universes = ("{}-{}".format(universe[0],universe[1]) for universe in universes)
+			packed_universes = ("{}-{}".format(universe[0],"".join(universe[1])) for universe in universes)
 			write_lines_to_file(output_universes, packed_universes)
 	
 	except FileExistsError:
@@ -304,7 +304,7 @@ def get_can_entangle(liveness, universes):
 # [S] Cascade.
 def cascade(universe_buffer, incoming_player_livenesses, voted_player_id=None): #expects regular liveness format, not t/f
 	#this fn takes the universe buffer and pre-calculated liveness state. It determines if anyone is now 100% dead (voted out or NKed), and if so, flips them, comparing with day 1 universe if necessary. We use a classical for loop rather than for..in to allow mutating the universe buffer directly. (This is normally bad practice but I don't have another spare 8 GB of memory.)
-	
+	flip_setup()
 	current_liveness = incoming_player_livenesses[:]
 	
 	while len(universe_buffer) > 0: 
@@ -342,7 +342,6 @@ def get_probability_table_idx(player_idx):
 
 def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate universe_buffer and current_liveness
 	global random_source
-	flip_setup()
 	
 	entangler_seen = False
 	entangler_only = True 
@@ -404,42 +403,43 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 		#easy way to do it
 		#we could probably just do this a few times at the start and it'd serve for most cases, but whatever. we spend an extra rng flip that way
 		chosen_universe_id = int(random_source.choice(universe_buffer)[0])
+		print(f"Chosen universe ID = {chosen_universe_id}")
 	final_player_role = get_player_role_in_orig_universe(player_id, chosen_universe_id)
 	
 	universe_idxes_to_remove = [*ent_universe_idxs] #if we got this far, the flip is not the entangler, so remove any universes where the player was the entangler
 	
-	print(f"Added {len(ent_universe_idxs)} entangler indexes to remove list")
+	#print(f"Added {len(ent_universe_idxs)} entangler indexes to remove list")
 	
 	current_liveness[player_id] = f"{final_player_role}{'V' if is_vote else 'X'}"
 	
 	if final_player_role == 'T':
 		print(f"{get_player_name(player_id)} was TOWN.")
 	else:
-		print(f"Added {len(town_universe_idxs)} town indexes to remove list")
+		#print(f"Added {len(town_universe_idxs)} town indexes to remove list")
 		universe_idxes_to_remove.extend(town_universe_idxs)
 	
 	if final_player_role in 'ABC':
 		print(f"{get_player_name(player_id)} was SCUM.")
 	else:
-		print(f"Added {len(scum_universe_idxs)} scum indexes to remove list")
+		#print(f"Added {len(scum_universe_idxs)} scum indexes to remove list")
 		universe_idxes_to_remove.extend(scum_universe_idxs)
 		
 	if final_player_role == 'D':
 		print(f"{get_player_name(player_id)} was the DETECTIVE.")
 	else:
-		print(f"Added {len(det_universe_idxs)} det indexes to remove list")
+		#print(f"Added {len(det_universe_idxs)} det indexes to remove list")
 		universe_idxes_to_remove.extend(det_universe_idxs)
 		
 	if final_player_role == 'F':
 		print(f"{get_player_name(player_id)} was the FOLLOWER.")
 	else:
-		print(f"Added {len(follower_universe_idxs)} follower indexes to remove list")
+		#print(f"Added {len(follower_universe_idxs)} follower indexes to remove list")
 		universe_idxes_to_remove.extend(follower_universe_idxs)
 		
 	if final_player_role == 'G':
 		print(f"{get_player_name(player_id)} was the GUARD.")
 	else:
-		print(f"Added {len(guard_universe_idxs)} follower indexes to remove list")
+		#print(f"Added {len(guard_universe_idxs)} follower indexes to remove list")
 		universe_idxes_to_remove.extend(guard_universe_idxs)
 		
 	universe_idxes_to_remove.sort(reverse=True)
@@ -481,9 +481,11 @@ def check_scum_victory(universe_buffer, num_scum_left):
 		print("*** SCUM VICTORY ***")
 		always_scum_indexes = [idx for idx, item in enumerate(always_scum) if item]
 		sometimes_scum_indexes = [idx for idx, item in enumerate(sometimes_scum) if item and not always_scum[idx]]
+		print(always_scum_indexes)
+		print(sometimes_scum_indexes)
 		num_variable_scum = num_scum_left - len(always_scum_indexes)
 		always_scum_names = [get_player_name(idx) for idx in always_scum_indexes]
-		sometimes_scum_names = [get_player_name(idx) for idx in always_scum_indexes]
+		sometimes_scum_names = [get_player_name(idx) for idx in sometimes_scum_indexes]
 		if num_variable_scum == 0:
 			print(f'The surviving scum player{"s" if num_scum_left > 1 else ""}, {oxford_comma(always_scum_names, "and")}, {"have" if num_scum_left > 1 else "has"} won.')
 		else: #num_variable_scum must be  > 1 
