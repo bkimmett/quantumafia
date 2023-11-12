@@ -292,8 +292,10 @@ def night():
 				elif guard_blocking_nk:
 					nk_hit_nonentangler_in_some_universe = True #it's an edge case. There is one universe where the nightkill did not kill the entangler, so that's good enough for quantum immortality!
 					output_buffer.append([universe_chunk[0],universe_to_transform]) #add to normal list
+					continue
 			
 				if not nk_hit_nonentangler_in_some_universe:
+					#print(f"Universe {universe_chunk} moved to entangler subsidiary list as nightkill hits entangler.")
 					universe_to_transform[scum_target_index] = 'X' #mark nightkill (exigent)
 					entangler_subsidiary_buffer.append([universe_chunk[0],universe_to_transform])
 				else:
@@ -318,7 +320,8 @@ def night():
 				qm_shared.paradox("nightkill/investigation") #will exit
 			output_buffer = entangler_subsidiary_buffer
 			print("It is my sad duty to announce that the Entangler has been killed in every surviving universe.")
-		else:
+		else:	
+			#print(f"Marking {len(entangler_subsidiary_buffer)} dead-entangler universes as collapsed.")
 			universes_collapsed[1] += len(entangler_subsidiary_buffer)
 		del entangler_subsidiary_buffer #maybe reclaim memory space
 	
@@ -419,7 +422,7 @@ def night():
 		entangler_request_list.sort(key=cmp_to_key(compare_masonry_objects))
 		max_masonries = min(len(entangler_request_list) // 2, 2)
 		
-		print(f"Creating up to {max_masonries} {'masonries' if max_masonries != 1 else 'masonry'}- with {len(entangler_request_list)} entangler requests, {len(entangler_request_list)} players requested.")
+		print(f"Creating up to {max_masonries} {'masonries' if max_masonries != 1 else 'masonry'} with {len(entangler_request_list)} entangler requests, {len(entangler_request_list)} players requested.")
 		print(entangler_request_list)
 		
 		masonries_made = 0

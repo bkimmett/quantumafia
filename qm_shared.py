@@ -84,7 +84,7 @@ def read_player_names():
 	global orig_setup, player_names
 	try:
 		with open("players.txt", 'r') as players:
-			player_names = [players.readline().rstrip('\n')[3:] for _ in range(orig_setup[0])]
+			player_names = [players.readline().rstrip('\n') for _ in range(orig_setup[0])]
 			return player_names
 		
 	except OSError:
@@ -102,11 +102,11 @@ def read_player_codewords():
 		print("Couldn't find the player codeword file, codewords.txt. Run initial_setup.py before running this file.")
 		exit()
 	
-def get_player_name(player_index):
+def get_player_name(player_index, include_marker=False):
 	global player_names
 	if player_names is None:
 		read_player_names()
-	return player_names[player_index]
+	return player_names[player_index][0 if include_marker else 3:]
 	
 def get_player_codeword(player_index):
 	#codewords are kind of complicated because we need to figure out where 
@@ -271,13 +271,13 @@ def close_masonries(existing_masonries, current_liveness, universes): #this muta
 	for idx, masonry in enumerate(existing_masonries):
 		if current_liveness[masonry[0]][1] != '#' or current_liveness[masonry[1]][1] != '#':
 			#either player dead, close masonry
-			print(f"Closing masonry between {get_player_name(masonry[0])} and {get_player_name(masonry[1])}, one or more players died.")
+			print(f"Closing masonry between {get_player_name(masonry[0], include_marker=True)} and {get_player_name(masonry[1], include_marker=True)}, one or more players died.")
 			masonries_to_remove.append(idx)
 			continue
 		masonry[3] = [ent1_candidate for ent1_candidate in masonry[3] if can_entangle[ent1_candidate]]
 		masonry[4] = [ent2_candidate for ent2_candidate in masonry[4] if can_entangle[ent2_candidate]]
 		if len(masonry[3]) == 0 or len(masonry[4]) == 0:
-			print(f"Closing masonry between {get_player_name(masonry[0])} and {get_player_name(masonry[1])}, no entanglers for one or more sides.")
+			print(f"Closing masonry between {get_player_name(masonry[0], include_marker=True)} and {get_player_name(masonry[1], include_marker=True)}, no entanglers for one or more sides.")
 			masonries_to_remove.append(idx)
 	masonries_to_remove.sort(reverse=True)
 
@@ -316,8 +316,14 @@ def cascade(universe_buffer, incoming_player_livenesses, voted_player_id=None): 
 			#flip() will mutate livenesses and we return the mutated liveness list
 			return current_liveness #we expect to mutate the buffer rather than 
 	
+		if voted_player_id is not None and liveness_result[voted_player_id] == False:
+			#handle voted-out player first
+			print(f'{get_player_name(voted_player_id, include_marker=True)} is now 100% dead (voted out). Flipping...')
+			flip(voted_player_id, universe_buffer, current_liveness, True)
+			liveness_result[voted_player_id] = True
+	
 		for player_id in (idx for idx, item in enumerate(liveness_result) if item == False): #for each dead player...
-			print(f'{get_player_name(player_id)} is now 100% dead {"(voted out)" if player_id == voted_player_id else "(nightkilled)"}. Flipping...')
+			print(f'{get_player_name(player_id, include_marker=True)} is now 100% dead {"(voted out?)" if player_id == voted_player_id else "(nightkilled)"}. Flipping...')
 			flip(player_id, universe_buffer, current_liveness, voted_player_id == player_id)
 
 	if len(universe_buffer) == 0: #SHOULD be impossible, but what do I know?
@@ -451,7 +457,7 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 		
 	if len(universe_buffer) == 0:
 		#this should be impossible, but we check anyway
-		paradox(f"flip of {get_player_name(player_id)}") #will exit
+		paradox(f"flip of {get_player_name(player_id, include_marker=True)}") #will exit
 	
 def check_scum_victory(universe_buffer, num_scum_left):
 	global player_liveness

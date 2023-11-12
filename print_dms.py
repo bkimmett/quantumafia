@@ -270,10 +270,10 @@ def print_dms():
 		current_setup_string_then = universe_then_file.readline().decode('utf-8').rstrip('\n')
 		setup_string_list_then = current_setup_string_then.split(sep="-", maxsplit=2)
 		current_setup_then = [int(setup_string_list_then[0]), int(setup_string_list_then[1]), *[char == '1' for char in setup_string_list_then[2]]]
-		has_detective_right_then = current_setup[2]
-		has_entangler_right_then = current_setup[3]
-		has_follower_right_then = current_setup[4]
-		has_guard_right_then = current_setup[5]
+		has_detective_right_then = current_setup_then[2]
+		has_entangler_right_then = current_setup_then[3]
+		has_follower_right_then = current_setup_then[4]
+		has_guard_right_then = current_setup_then[5]
 		player_liveness_then_string = universe_then_file.readline().decode('utf-8').rstrip('\n')
 		player_liveness_then = [player_liveness_then_string[x*2:(x+1)*2] for x in range(num_players)]
 		num_universes_then = int(universe_then_file.readline().decode('utf-8').rstrip('\n'))
@@ -321,7 +321,7 @@ def print_dms():
 			if has_guard_right_then:
 				guard_requests = [qm_shared.player_to_pos(target) if target != '#' else None for target in (player_action[guard_index] if player_liveness_then[idx][1] == '#' else '#' for idx, player_action in enumerate(player_action_blocs))]
 	
-		if has_entangler_right_then:	
+		if has_entangler_right_then:
 			entangler_requests = [qm_shared.player_to_pos(target) if target != '#' else None for target in (player_action[entangler_index] if player_liveness_then[idx][1] == '#' else '#' for idx, player_action in enumerate(player_action_blocs))]
 	
 	
@@ -336,7 +336,8 @@ def print_dms():
 		can_have_been_entangler = [False for item in player_liveness]
 		can_have_been_follower = [False for item in player_liveness]
 		counts = [[[0,0,0,0,0],0,[0,0],0,0,0,0,0] if item[1] == '#' else None for item in player_liveness] #dead now as [det, ent, follower, guard, town], dead before, [alpha scum, backup scum], det, ent, follower, guard, town (can't die from nightkill as scum)
-		live_indexes = [idx for idx, item in enumerate(player_liveness_then) if item[1] == '#']
+		live_indexes_then = [idx for idx, item in enumerate(player_liveness_then) if item[1] == '#']
+		live_indexes = [idx for idx, item in enumerate(player_liveness) if item[1] == '#']
 		
 		for _ in range(num_universes):
 			universe_now_block = qm_shared.parse_universe(universe_now_file.readline())
@@ -345,29 +346,41 @@ def print_dms():
 				universe_then = read_to_universe_with_id(universe_then_file, int(universe_now_block[0]))[1]
 			else:
 				universe_then = universe_now #D1: no previous universe to go back to
-			
-			for player_idx in live_indexes:
+
+			for player_idx in live_indexes_then:
 				#so unlike the night version, we need to track BOTH the role count AND the result.
 				role = universe_now[player_idx]
-				
 				if role in 'XV':
 					#dead. so did they JUST die?
 					#we don't bother to track results in this case, because if they died just now, obviously they were scum, they failed as the guard, and get no results as the detective.
 					role_then = universe_then[player_idx]
+					#this bit has guardrails. We need to track if the player was the guard last night, because then their visit is added to the follower list. Else do nothing. Can throw an error if trying to update their result counts.
+					player_cidx = None
 					if role_then in 'XV':
-						#they were dead before.
-						counts[player_idx][1] += 1
+						#they were dead before.	
+						if counts[player_idx] is not None:
+							counts[player_idx][1] += 1
+						continue
 					elif role_then == 'D':
-						counts[player_idx][0][0] += 1
+						player_cidx = 0
 					elif role_then == 'E':
-						counts[player_idx][0][1] += 1
+						player_cidx = 1
 					elif role_then == 'F':
-						counts[player_idx][0][2] += 1
-						can_have_been_follower[player_idx] = True
+						player_cidx = 2
+						if counts[player_idx] is not None:
+							can_have_been_follower[player_idx] = True
 					elif role_then == 'G':
-						counts[player_idx][0][3] += 1
+						#mark guard visit even if the guard is dead now
+						guard_target = guard_requests[player_idx]
+						gtarget_role_then = universe_then[guard_target]
+						if gtarget_role_then != 'X':
+							#guard visits if the player was alive before
+							follower_visits[player_idx][2] = True
+						player_cidx = 3
 					elif role_then == 'T':
-						counts[player_idx][0][4] += 1
+						player_cidx = 4
+					if counts[player_idx] is not None:
+						counts[player_idx][0][player_cidx] += 1
 					continue
 				if role == 'A':
 					#alpha scum.
@@ -669,6 +682,7 @@ def print_dms():
 						#you tried to kill {} in {} of them, but were fought off by the guard. {} was already dead beforehand in {} more universes.	
 				else:
 					print("You are not alive as scum in any universe.")
+					print()
 					
 				if player_counts[3] > 0: #detective
 					det_target = qm_shared.get_player_name(detective_requests[player_idx])
@@ -709,6 +723,7 @@ def print_dms():
 					print()
 				elif has_detective_right_now:
 					print("You are not alive as the detective in any universe.")
+					print()
 
 				if player_counts[4] > 0: #entangler
 					if entangler_requests[player_idx] is not None:
@@ -728,6 +743,7 @@ def print_dms():
 						print()
 				elif has_entangler_right_now:
 					print("You are not alive as the entangler in any universe.")
+					print()
 
 				if follower_results[player_idx] is not None:
 					follower_target = qm_shared.get_player_name(follower_requests[player_idx])
@@ -742,10 +758,11 @@ def print_dms():
 					print()
 				elif has_follower_right_now:
 					if can_have_been_follower[player_idx]:
-						print("You are not alive as the **follower** in any universe... but you _were_ last night, so you get those results anyway.\n{tab()}{follower_result}")
+						print(f"You are not alive as the **follower** in any universe... but you _were_ last night, so you get those results anyway.\n{tab()}{follower_result}")
 						print()
 					else:
 						print("You are not alive as the follower in any universe.")
+						print()
 					
 				if player_counts[6] > 0: #guard
 					guard_target = qm_shared.get_player_name(guard_requests[player_idx])
@@ -776,6 +793,7 @@ def print_dms():
 					print()
 				elif has_guard_right_now:
 					print("You are not alive as the guard in any universe.")
+					print()
 
 				if player_counts[7] > 0: #town
 					print(f"As **vanilla town**, you are alive in {percent(player_counts[7], num_universes)} universe{plural(player_counts[7])}.")		

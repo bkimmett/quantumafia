@@ -164,7 +164,7 @@ def day():
 			min_living_players = min(min_living_players, players_in_this_univ)
 			max_living_players = max(max_living_players, players_in_this_univ)
 
-		write_final_universe_file(output_buffer, "universes-final.txt")
+		qm_shared.write_final_universe_file(output_buffer, "universes-final.txt")
 		if not any(sometimes_alive):
 			print("*** DRAW ***")
 			print("Everybody dies. The game is over!")
@@ -175,8 +175,8 @@ def day():
 			sometimes_alive_indexes = [idx for idx, item in enumerate(sometimes_alive) if item and not always_alive[idx]]
 			min_variable_living_players = min_living_players - len(always_alive_indexes)
 			max_variable_living_players = max_living_players - len(always_alive_indexes)
-			always_alive_names = [get_player_name(idx) for idx in always_scum_indexes]
-			sometimes_alive_names = [get_player_name(idx) for idx in sometimes_scum_indexes]
+			always_alive_names = [qm_shared.get_player_name(idx) for idx in always_alive_indexes]
+			sometimes_alive_names = [qm_shared.get_player_name(idx) for idx in sometimes_alive_indexes]
 			if max_variable_living_players == 0:
 				print(f'The surviving town player{"s" if num_players_left > 1 else ""}, {qm_shared.oxford_comma(always_alive_names, "and")}, {"have" if num_players_left > 1 else "has"} won.')
 			else:		
