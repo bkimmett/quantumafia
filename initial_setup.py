@@ -10,8 +10,8 @@ def player_marker(num): #0 = A, 1 = B...
 def setup():
 	#QUANTUMAFIA SETUP 1 - INITIAL SETUP
 	#to change starting parameters, change this
-	num_players = 8 #19 
-	num_mafia = 2 #3 #use 'abc' by default. more will use ABCHIJ ig? [HIJKLMNOPQRS]
+	num_players = 19  #8 for testing 
+	num_mafia = 3  #2 for testing  #use 'abc' by default. more will use ABCHIJ ig? [HIJKLMNOPQRS]
 	has_detective = True
 	has_entangler = True
 	has_follower = True

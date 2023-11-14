@@ -19,10 +19,10 @@ def percent(num, num_universes):
 		return "{} ({:.1%})".format(num, result)
 	
 def table_percent(fraction):
-	if fraction.is_integer():
-		return "{:<8.0%}".format(fraction) #< is right pad. 5 is min total width. .0 indicates decimal places. % forces percentage calculation
+	if (fraction*100).is_integer():
+		return "{:<9.0%}".format(fraction) #< is right pad. 5 is min total width. .0 indicates decimal places. % forces percentage calculation
 	else:
-		return "{:<8.1%}".format(fraction)
+		return "{:<9.1%}".format(fraction)
 	
 def and_or_all(counts, terms):
 	list_mix = [(thiscount, terms[idx]) for idx, thiscount in enumerate(counts) if thiscount > 0]
@@ -426,7 +426,7 @@ def print_dms():
 						elif itarget_role_now == 'E': #entangler
 							results[player_idx][1][2] += 1
 						elif itarget_role_now in 'FG': #follower or guard (town power)
-							results[player_idx][1][0] += 1
+							#results[player_idx][1][0] += 1
 							results[player_idx][1][1] += 1
 						elif itarget_role_now == 'T':
 							results[player_idx][1][0] += 1
@@ -690,7 +690,7 @@ def print_dms():
 					detective_result = f"As the **detective**, you investigated {det_target} (and are alive) in {percent(player_counts[3], num_universes)} universe{plural(player_counts[3])}."
 					num_results = len([x for x in player_results[1] if x > 0]) 
 					
-					if num_results == 1 or (num_results == 2 and player_results[1][0] > 0 and player_results[1][1] == player_results[1][0]):
+					if num_results == 1: #or (num_results == 2 and player_results[1][0] > 0 and player_results[1][1] == player_results[1][0]):
 						#only one outcome, simple messages (also handles case where there is only one universe left)
 						multiple_universes =  not (sum(player_results[1]) - player_results[1][1] == 1)
 						if player_results[1][4] > 0: #dead
@@ -717,7 +717,7 @@ def print_dms():
 							role = "i.e. the follower"
 						else:
 							role = "the follower or guard"
-						detective_result += "\n{}They {}.".format(tab(), and_or_all(player_results[1], ["are town-aligned", "hold a town power role ({})".format(role), "are the entangler", "are scum", "are dead"]))
+						detective_result += "\n{}They {}.".format(tab(), and_or_all(player_results[1], ["are vanilla town", "hold a town power role ({})".format(role), "are the entangler", "are scum", "are dead"]))
 	
 					print(detective_result)
 					print()
@@ -999,9 +999,9 @@ def print_dms():
 				role = 'GUARD'
 			elif role_item == 'T':
 				role = 'TOWN'
-			print(f' {qm_shared.get_player_codeword(player_idx)} - {qm_shared.get_player_name(player_idx)} - {"voted out" if player_liveness[player_idx][1] == "V" else "100% dead"} - {role}')
+			print(f'{qm_shared.get_player_codeword(player_idx)}      {qm_shared.get_player_name(player_idx)} - {"voted out" if player_liveness[player_idx][1] == "V" else "100% dead"} - {role}')
 		else:
-			print('{}   {}{}{}{}{}'.format(qm_shared.get_player_codeword(player_idx), *aggregated_counts[player_idx]))
+			print('{}    {}{}{}{}{}'.format(qm_shared.get_player_codeword(player_idx), *aggregated_counts[player_idx]))
 			
 			
 			
