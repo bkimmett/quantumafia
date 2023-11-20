@@ -11,12 +11,16 @@ def tab():
 def plural(num):
 	return "s" if num != 1 else ""
 	
-def percent(num, num_universes):
+def percent(num, num_universes, square_brackets=False):
 	result = num / num_universes
 	if (result*100).is_integer():
-		return "{} ({:.0%})".format(num, result)
+		if square_brackets:
+			return "{:,} [{:.0%}]".format(num, result)
+		return "{:,} ({:.0%})".format(num, result)
 	else:
-		return "{} ({:.1%})".format(num, result)
+		if square_brackets:
+			return "{:,} [{:.1%}]".format(num, result)
+		return "{:,} ({:.1%})".format(num, result)
 	
 def table_percent(fraction):
 	if (fraction*100).is_integer():
@@ -24,7 +28,8 @@ def table_percent(fraction):
 	else:
 		return "{:<9.1%}".format(fraction)
 	
-def and_or_all(counts, terms):
+def and_or_all(counts, terms, include_percents=False, override_total=None):
+	total = override_total if override_total is not None else sum(counts)
 	list_mix = [(thiscount, terms[idx]) for idx, thiscount in enumerate(counts) if thiscount > 0]
 	if len(list_mix) == 1:
 		if list_mix[0][1] == 1:
@@ -34,7 +39,10 @@ def and_or_all(counts, terms):
 	elif len(list_mix) > 1:
 		output = ""
 		for idx, item in enumerate(list_mix):
-			block = f"{item[1]} in {item[0]}"
+			if include_percents:
+				block = f"{item[1]} in {percent(item[0], total, square_brackets=True)}"
+			else:
+				block = f"{item[1]} in {item[0]:,}"
 			if idx == len(list_mix) - 1: #last item
 				if idx > 1:
 					output += ","
@@ -521,7 +529,7 @@ def print_dms():
 			
 			if entangler_only: #day 1	
 				#note that we don't handle the case where a player is 0% dead and 100% some role...
-				print(f'{num_universes} universes remain.\n')
+				print(f'{num_universes:,} universes remain.\n')
 				if sum(player_counts[2]) > 0: #scum
 					total_scum = sum(player_counts[2])
 					alpha_scum = player_counts[2][0]
@@ -552,7 +560,7 @@ def print_dms():
 			
 			elif num_universes == 1:
 				if num_universes_disappeared > 0:
-					print(f"**Last night, {num_universes_disappeared} universes collapsed. One universe remains:**")
+					print(f"**Last night, {num_universes_disappeared:,} universes collapsed. One universe remains:**")
 				else:
 					print("A single universe remains.")
 				#don't track dead in this case, they're alive in THIS universe and that's what matters
@@ -631,9 +639,9 @@ def print_dms():
 					print(tab()+follower_result)
 			else:
 				if num_universes_disappeared > 0:
-					print(f"**Last night, {num_universes_disappeared} universes collapsed. In the other {num_universes}:**")
+					print(f"**Last night, {num_universes_disappeared:,} universes collapsed. In the other {num_universes:,}:**")
 				else:
-					print(f"No universes collapsed last night. {num_universes} universes remain.")
+					print(f"No universes collapsed last night. {num_universes:,} universes remain.")
 				print()
 				if(sum(player_counts[0]) > 0):
 					#calculate how to say it
@@ -665,25 +673,25 @@ def print_dms():
 						nk_target = qm_shared.get_player_name(nightkill_requests[player_idx])
 						
 						if num_results == 1:
-							scum_outcome = f"Last night, in the {alpha_scum} universe{plural(alpha_scum)} where you are alpha scum, "
+							scum_outcome = f"Last night, in the {alpha_scum:,} universe{plural(alpha_scum)} where you are alpha scum, "
 							if player_results[0][0] > 0: #success
-								scum_outcome += f"you successfully killed {nk_target}."
+								scum_outcome += f"**you successfully killed {nk_target}**."
 							elif player_results[0][1] > 0: #already dead
-								scum_outcome += f"you tried to kill {nk_target}, but they were already dead when you got there."
+								scum_outcome += f"you tried to kill {nk_target}, but **they were already dead when you got there**."
 							elif player_results[0][2] > 0: #blocked by guard
-								scum_outcome += f"you tried to kill {nk_target}, but were fought off by the guard."
+								scum_outcome += f"you tried to kill {nk_target}, but **were fought off by the guard**."
 						else:
-							scum_outcome = f"Last night, in the {alpha_scum} universe{plural(alpha_scum)} where you are alpha scum, "
+							scum_outcome = f"Last night, in the {alpha_scum:,} universe{plural(alpha_scum)} where you are alpha scum, "
 							if player_results[0][0] > 0:
-								scum_outcome += f"you successfully killed {nk_target} in {player_results[0][0]} of them"
+								scum_outcome += f"**you successfully killed {nk_target}** in {percent(player_results[0][0], alpha_scum, square_brackets=True)} of them"
 								if player_results[0][2] > 0:
-									scum_outcome += f", and were fought off by the guard in {player_results[0][2]}."
+									scum_outcome += f", and **were fought off by the guard** in {percent(player_results[0][2], alpha_scum, square_brackets=True)}."
 								else:
 									scum_outcome += "."
 							else: #must be guard and dead
-								scum_outcome += f"you tried to kill {nk_target} in {player_results[0][2]} of them, but were fought off by the guard."
+								scum_outcome += f"you tried to kill {nk_target} in {percent(player_results[0][2], alpha_scum, square_brackets=True)} of them, but **were fought off by the guard**."
 							if player_results[0][1] > 0:
-								scum_outcome += f' {nk_target} was already dead when you got there in {player_results[0][1]}{" more" if num_results < 3 else ""} universe{plural(player_results[0][1])}.'
+								scum_outcome += f' {nk_target} **was already dead** when you got there in {percent(player_results[0][1], alpha_scum, square_brackets=True)}{" more" if num_results < 3 else ""} universe{plural(player_results[0][1])}.'
 						print(tab()+scum_outcome)
 						print()
 						
@@ -730,7 +738,9 @@ def print_dms():
 							role = "i.e. the follower"
 						else:
 							role = "the follower or guard"
-						detective_result += "\n{}They {}.".format(tab(), and_or_all(player_results[1], ["are vanilla town", "hold a town power role ({})".format(role), "are the entangler", "are scum", "are dead"]))
+						detective_result += "\n{}They {}.".format(tab(), and_or_all(player_results[1], ["are **vanilla town**", "hold a **town power role** ({})".format(role), "are the **entangler**", "are **scum**", "are **dead**"], include_percents=True))
+						if player_results[1][4] == 0:
+							detective_result += " They are **not dead** in any universe you investigated."
 	
 					print(detective_result)
 					print()
@@ -744,9 +754,9 @@ def print_dms():
 					if player_counts[4] == num_universes:
 						#only one entangler - can't submit.
 						if liveness_then[player_idx][0] != 'E':
-							print(f"As the **entangler**, you are alive in {player_counts[4]} universes - that's every universe.\n{tab()}Last night, you tried to pull **{ent_target}** into a masonry, but **every universe with a different entangler collapsed**. Sorry!")
+							print(f"As the **entangler**, you are alive in {player_counts[4]:,} universes - that's every universe.\n{tab()}Last night, you tried to pull **{ent_target}** into a masonry, but **every universe with a different entangler collapsed**. Sorry!")
 						else: 
-							print(f"As the **entangler**, you are alive in {player_counts[4]} universes - that's every universe.\n{tab()}Nothing happened last night.")
+							print(f"As the **entangler**, you are alive in {player_counts[4]:,} universes - that's every universe.\n{tab()}Nothing happened last night.")
 					else:
 						if entangler_results[player_idx]:
 							ent_result = f"**successfully pulled {ent_target} into a masonry!**"
@@ -785,23 +795,24 @@ def print_dms():
 					
 					if num_results == 1:
 						if player_results[2][0] > 0: #no activity
-							guard_result += f'Your night was uneventful{" in all of them" if multiple_universes else ""}.'
+							guard_result += f'**Your night was uneventful{" in all of them" if multiple_universes else ""}**.'
 						elif player_results[2][1] > 0: #fought off
-							guard_result += f'You fought off someone trying to kill {guard_target}{" in all of them" if multiple_universes else ""}!'
+							guard_result += f'**You fought off someone trying to kill {guard_target}{" in all of them" if multiple_universes else ""}**!'
 						elif player_results[2][2] > 0: #already dead
-							guard_result += f'Sadly, {guard_target} was already dead when you got there{", in all the universes you made the attempt" if multiple_universes else ""} - they had died before the night began.'
+							guard_result += f'Sadly, {guard_target} **was already dead when you got there**{", in all the universes you made the attempt" if multiple_universes else ""} - they had died before the night began.'
 					else:
+						
 						#"You had an uneventful night in {}
 						if player_results[2][2] > 0 and num_results < 3:
 							guard_result += 'You '
 							if player_results[2][0] > 0:
-								guard_result += f'had an uneventful night in {player_results[2][0]} of them.'
+								guard_result += f'**had an uneventful night** in {percent(player_results[2][0], player_counts[6], square_brackets=True)} of them.'
 							else: #implies must have fought off
-								f"fought off someone trying to kill {guard_target} in {player_results[2][1]} of them."
+								f"**fought off someone trying to kill {guard_target}** in {percent(player_results[2][1], player_counts[6], square_brackets=True)} of them."
 						else:
-							guard_result += 'You '+and_or_all(player_results[2], ["had an uneventful night", f"fought off someone trying to kill {guard_target}"])+'.'
+							guard_result += 'You '+and_or_all(player_results[2], ["**had an uneventful night**", f"**fought off someone trying to kill {guard_target}**"], include_percents=True, override_total=player_counts[6])+'.'
 						if player_results[2][2] > 0:
-							guard_result += f' {guard_target} was already dead when you got there in {player_results[2][2]} universe{plural(player_results[2][2])}.'
+							guard_result += f' {guard_target} **was already dead when you got there** in {percent(player_results[2][2], player_counts[6], square_brackets=True)} universe{plural(player_results[2][2])}.'
 					print(guard_result)
 					print()
 				elif has_guard_right_now:
@@ -892,7 +903,7 @@ def print_dms():
 					print("You are **vanilla town**.")
 			else:
 				if num_universes_disappeared > 0:
-						print(f"Today, {num_universes_disappeared} universes collapsed. In the other {num_universes}:")
+						print(f"Today, {num_universes_disappeared:,} universes collapsed. In the other {num_universes:,}:")
 				else:
 					print(f'{"No universes collapsed today. " if args.num > 0 else ""}{num_universes} universes remain.\n')
 				print()
@@ -1022,8 +1033,9 @@ def print_dms():
 			
 	if args.num > 0:
 		print()	
-	print(f'{num_universes} universe{"s" if num_universes > 1 else ""} remain{"" if num_universes > 1 else "s"}.')	
+	print(f'{num_universes:,} universe{"s" if num_universes > 1 else ""} remain{"" if num_universes > 1 else "s"}.')	
 	if args.num > 0:
+		print()
 		print_masonry_count_diff()
 	
 	#AND WE ARE DONE.
