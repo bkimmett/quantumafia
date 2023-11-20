@@ -181,8 +181,20 @@ def print_masonry_removed(masonry, player_idx, masonries_now_subset, masonries_t
 def print_masonry_added(masonry, player_idx):
 	is_first_player = player_idx == masonry[0]
 	other_player = qm_shared.get_player_name(masonry[1] if is_first_player else masonry[0])
-	possible_entanglers = [qm_shared.get_player_name(item) for item in masonry[3]] if is_first_player else [qm_shared.get_player_name(item) for item in masonry[4]]
-	print(f'**You have been pulled into a masonry** with {other_player}, by {"one of " if len(possible_entanglers) > 1 else ""}{qm_shared.oxford_comma(possible_entanglers, "or")}.')
+	possible_entanglers_nums = masonry[3][:] if is_first_player else masonry[4][:]
+	skip_main_print = False
+	if player_idx in possible_entanglers_nums:
+		if len(possible_entanglers_nums) == 1:
+			print(f'**You have pulled yourself into a masonry with {other_player}!**')
+			skip_main_print = True
+		else:
+			possible_entanglers_nums.remove(player_idx)
+			possible_entanglers = [qm_shared.get_player_name(item) for item in possible_entanglers_nums]
+			possible_entanglers.insert(0,"yourself")
+	else:
+		possible_entanglers = [qm_shared.get_player_name(item) for item in possible_entanglers_nums]
+	if not skip_main_print:	
+		print(f'**You have been pulled into a masonry with {other_player},** by {"one of " if len(possible_entanglers) > 1 else ""}{qm_shared.oxford_comma(possible_entanglers, "or")}.')
 		
 
 def print_codeword(player_idx):
@@ -509,6 +521,7 @@ def print_dms():
 			
 			if entangler_only: #day 1	
 				#note that we don't handle the case where a player is 0% dead and 100% some role...
+				print(f'{num_universes} universes remain.\n')
 				if sum(player_counts[2]) > 0: #scum
 					total_scum = sum(player_counts[2])
 					alpha_scum = player_counts[2][0]
@@ -854,6 +867,7 @@ def print_dms():
 					print(f"Today, {num_universes_disappeared} universes collapsed. One universe remains:")
 				else:
 					print("A single universe remains.")
+				print()
 				if sum(counts[player_idx][1]) > 0:
 					if num_scum_left > 1:
 						other_scum_names = [qm_shared.get_player_name(idx) for idx, item in enumerate(player_liveness) if item[0] in 'ABC' and idx != player_idx]
@@ -880,7 +894,8 @@ def print_dms():
 				if num_universes_disappeared > 0:
 						print(f"Today, {num_universes_disappeared} universes collapsed. In the other {num_universes}:")
 				else:
-					print(f'{"No universes collapsed today. " if args.num > 0 else ""}{num_universes} universes remain.')
+					print(f'{"No universes collapsed today. " if args.num > 0 else ""}{num_universes} universes remain.\n')
+				print()
 				player_counts = counts[player_idx]	
 				
 				if player_counts[0] > 0:
@@ -967,7 +982,7 @@ def print_dms():
 	print()
 	print("Public probability table:")
 	has_power = has_detective or has_follower or has_guard
-	print(f'Who     Town%   {"Power%  " if has_power else ""}{"Ent%    " if has_entangler else ""}Scum%   Dead%   ')
+	print(f'Who      Town%    {"Power%   " if has_power else ""}{"Ent%     " if has_entangler else ""}Scum%    Dead%    ')
 	
 	aggregated_counts = [[table_percent(x / num_universes) for x in item] if item is not None else None for item in aggregated_counts]
 		

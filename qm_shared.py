@@ -352,59 +352,38 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 	entangler_seen = False
 	entangler_only = True 
 	
-	scum_universe_idxs = []
-	det_universe_idxs = []
-	ent_universe_idxs = []
-	follower_universe_idxs = []
-	guard_universe_idxs = []
-	town_universe_idxs = []
+	nonentangler_universe_ids = []
 	
 	#in the first pass, we just assess the player's state in the still living universes.
-	for idx, universe in enumerate(universe_buffer):
+	for universe in universe_buffer:
+		universe_id = int(universe[0])
 		player_role_in_that_universe = get_player_role_in_orig_universe(player_id, int(universe[0]))
 		#print(f"Player is {player_role_in_that_universe} in universe {int(universe[0])}.") #debug
+		if player_role_in_that_universe in 'BC':
+			player_role_in_that_universe = 'A'
+
+		universe.append(player_role_in_that_universe)
 		
 		if player_role_in_that_universe == 'E':
 			entangler_seen = True
-			ent_universe_idxs.append(idx)
 			continue
 			
 		entangler_only = False
-		
-		if player_role_in_that_universe == 'T':
-			town_universe_idxs.append(idx)
-			continue
-		if player_role_in_that_universe in 'ABC':
-			scum_universe_idxs.append(idx)
-			continue
-		if player_role_in_that_universe == 'D':
-			det_universe_idxs.append(idx)
-			continue
-		if player_role_in_that_universe == 'F':
-			follower_universe_idxs.append(idx)
-			continue
-		if player_role_in_that_universe == 'G':
-			guard_universe_idxs.append(idx)
-			continue
-	
+		nonentangler_universe_ids.append(universe_id)
+
 	#now, we pick a flip. There are a few ways to do this depending on if the entangler is present or not
 	
 	if entangler_only:
 		#every possibility is the entangler. Also leads to a non-collapse situation.
 		print(f"{get_player_name(player_id)} was the ENTANGLER.")
-		assert len(town_universe_idxs) == 0
-		assert len(det_universe_idxs) == 0
-		assert len(scum_universe_idxs) == 0
-		assert len(follower_universe_idxs) == 0
-		assert len(guard_universe_idxs) == 0
+		assert len(nonentangler_universe_ids) == 0
 		print("No universes have collapsed.")
 		current_liveness[player_id] = f"E{'V' if is_vote else 'X'}"
 		return #no mutation needed, no collapses from this event
 	elif entangler_seen:
 		#pick a random choice from the combined list of all the non-entangler universes.
-		chosen_universe_idx = random_source.choice([*town_universe_idxs, *scum_universe_idxs, *det_universe_idxs, *follower_universe_idxs, *guard_universe_idxs])
-		chosen_universe_id = int(universe_buffer[chosen_universe_idx][0])
-		print(f"Chosen universe = {universe_buffer[chosen_universe_idx]}")
+		chosen_universe_id = random_source.choice([*town_universe_idxs, *scum_universe_idxs, *det_universe_idxs, *follower_universe_idxs, *guard_universe_idxs])
+		print(f"Chosen universe ID = {chosen_universe_id}")
 	else:
 		#easy way to do it
 		#we could probably just do this a few times at the start and it'd serve for most cases, but whatever. we spend an extra rng flip that way
@@ -412,48 +391,35 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 		print(f"Chosen universe ID = {chosen_universe_id}")
 	final_player_role = get_player_role_in_orig_universe(player_id, chosen_universe_id)
 	
-	universe_idxes_to_remove = [*ent_universe_idxs] #if we got this far, the flip is not the entangler, so remove any universes where the player was the entangler
-	
-	#print(f"Added {len(ent_universe_idxs)} entangler indexes to remove list")
-	
 	current_liveness[player_id] = f"{final_player_role}{'V' if is_vote else 'X'}"
 	
 	if final_player_role == 'T':
 		print(f"{get_player_name(player_id)} was TOWN.")
-	else:
-		#print(f"Added {len(town_universe_idxs)} town indexes to remove list")
-		universe_idxes_to_remove.extend(town_universe_idxs)
-	
+
 	if final_player_role in 'ABC':
 		print(f"{get_player_name(player_id)} was SCUM.")
-	else:
-		#print(f"Added {len(scum_universe_idxs)} scum indexes to remove list")
-		universe_idxes_to_remove.extend(scum_universe_idxs)
+		final_player_role = 'A' #normalize scum roles for upcoming use in removal
 		
 	if final_player_role == 'D':
 		print(f"{get_player_name(player_id)} was the DETECTIVE.")
-	else:
-		#print(f"Added {len(det_universe_idxs)} det indexes to remove list")
-		universe_idxes_to_remove.extend(det_universe_idxs)
 		
 	if final_player_role == 'F':
 		print(f"{get_player_name(player_id)} was the FOLLOWER.")
-	else:
-		#print(f"Added {len(follower_universe_idxs)} follower indexes to remove list")
-		universe_idxes_to_remove.extend(follower_universe_idxs)
-		
+
 	if final_player_role == 'G':
 		print(f"{get_player_name(player_id)} was the GUARD.")
-	else:
-		#print(f"Added {len(guard_universe_idxs)} follower indexes to remove list")
-		universe_idxes_to_remove.extend(guard_universe_idxs)
+	
+	universes_before = len(universe_buffer)
+	
+	print(f"About to collapse universes...")
+	#we have an interesting problem here: we can't actually use 'del' to delete all these universes. Not really. Each 'del' is an O(n) operation. It'll take forever.
+	#instead, we write over the list using a list comprehension, and strip off the temporary data we wrote to each universe.
 		
-	universe_idxes_to_remove.sort(reverse=True)
+	universe_buffer[:] = [universe[0:2] for universe in universe_buffer if universe[2] == final_player_role] 
 	
-	print(f"{len(universe_idxes_to_remove)} universes collapse.")
+	universes_after = len(universe_buffer)
 	
-	for removing_idx in universe_idxes_to_remove:
-		del universe_buffer[removing_idx] #we remove in reverse order else earlier removals will get the indexes wrong for later
+	print(f"{universes_before - universes_after} universes collapse.")
 		
 	if len(universe_buffer) == 0:
 		#this should be impossible, but we check anyway

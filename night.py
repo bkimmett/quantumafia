@@ -540,7 +540,7 @@ def compare_masonry_objects(masonry_1, masonry_2): #returns -1 if a < b in ascen
 	requests_compare = len(masonry_2[2]) - len(masonry_1[2]) #number of requests, MOST to FEWEST [reverse]
 	if requests_compare != 0:
 		return requests_compare
-	universes_compare = masonry_2[3] - masonry_1[3] #number of universes, MOST to FEWEST [reverse]
+	universes_compare = masonry_1[3] - masonry_2[3] #number of universes, FEWEST to MOST
 	if universes_compare != 0:
 		return universes_compare
 	return masonry_1[4] - masonry_2[4] #public probability table compare, FEWEST to MOST - cannot tie
