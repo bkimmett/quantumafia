@@ -10,6 +10,13 @@ def tab():
 
 def plural(num):
 	return "s" if num != 1 else ""
+
+def vf_percent(num, total):
+	result = num / total
+	if (result*100) < 1.0:
+		return f"{result:.1%}"
+	else:
+		return f"{result:.0%}"
 	
 def percent(num, num_universes, square_brackets=False):
 	result = num / num_universes
@@ -612,7 +619,7 @@ def print_dms():
 						result = "Nothing happened last night."
 					print(f"You are the **entangler**.\n{tab()}{result}")
 				elif player_counts[5] > 0 or can_have_been_follower[player_idx] == True:
-					follower_target = qm_shared.get_player_name(follower_requests[player_idx])
+					follower_target = "you" if follower_requests[player_idx] == player_idx else qm_shared.get_player_name(follower_requests[player_idx])
 					if len(follower_results[player_idx]) > 0:
 						#X, Y, Z,  	 A visited {} last night, in _some_ universe.
 						follower_result = f'**{qm_shared.oxford_comma([qm_shared.get_player_name(player) for player in follower_results[player_idx]], "and")} {"all" if len(follower_results[player_idx]) > 1 else ""} visited {follower_target} last night**, {"each visiting " if len(follower_results[player_idx]) > 1 else ""}in _some_ surviving universe.'
@@ -993,10 +1000,30 @@ def print_dms():
 	print()
 	print("Public probability table:")
 	has_power = has_detective or has_follower or has_guard
-	print(f'Who      Town%    {"Power%   " if has_power else ""}{"Ent%     " if has_entangler else ""}Scum%    Dead%    ')
+	print(f'Who      Town%    {"Power%   " if has_power else ""}{"Ent%     " if has_entangler else ""}Scum%    Dead%    Voteflip ')
+	
+	aggregated_counts_extend = []
+	
+	for item in aggregated_counts:
+		if item is None:
+			aggregated_counts_extend.append(None)
+			continue
+		#calculate voteflip. If 100% town/scum, say 'Town' or 'Scum' (or 'Ent') else say town/scum percentage
+		#item[0] is town. item[2] is entangler. item[3] is scum.
+		if item[0] + item[3] == 0 and item[2] > 0:
+			aggregated_counts_extend.append("Ent")
+		elif item[0] == 0 and item[3] > 0:
+			aggregated_counts_extend.append("Scum")
+		elif item[3] == 0 and item[0] > 0:
+			aggregated_counts_extend.append("Town")
+		elif item[0] == 0 and item[3] == 0:
+			aggregated_counts_extend.append("ERROR!!")
+		else:
+			minitotal = item[0] + item[3]
+			aggregated_counts_extend.append(f"{vf_percent(item[0],minitotal)} T / {vf_percent(item[3],minitotal)} S")
 	
 	aggregated_counts = [[table_percent(x / num_universes) for x in item] if item is not None else None for item in aggregated_counts]
-		
+
 	if not has_entangler:
 		for item in aggregated_counts:
 			if item is None:
@@ -1027,7 +1054,7 @@ def print_dms():
 				role = 'TOWN'
 			print(f'{qm_shared.get_player_codeword(player_idx)}      {qm_shared.get_player_name(player_idx)} - {"voted out" if player_liveness[player_idx][1] == "V" else "100% dead"} - {role}')
 		else:
-			print('{}    {}{}{}{}{}'.format(qm_shared.get_player_codeword(player_idx), *aggregated_counts[player_idx]))
+			print('{}    {}{}{}{}{}{}'.format(qm_shared.get_player_codeword(player_idx), *aggregated_counts[player_idx],aggregated_counts_extend[player_idx]))
 			
 			
 			

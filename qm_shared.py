@@ -415,7 +415,7 @@ def flip(player_id, universe_buffer, current_liveness, is_vote): #will mutate un
 	#we have an interesting problem here: we can't actually use 'del' to delete all these universes. Not really. Each 'del' is an O(n) operation. It'll take forever.
 	#instead, we write over the list using a list comprehension, and strip off the temporary data we wrote to each universe.
 		
-	universe_buffer[:] = [universe[0:2] for universe in universe_buffer if universe[2] == final_player_role] 
+	universe_buffer[:] = [universe[0:2] for universe in universe_buffer if universe[2] == final_player_role]  #this may take a very long time. up to 30 minutes for D1
 	
 	universes_after = len(universe_buffer)
 	
