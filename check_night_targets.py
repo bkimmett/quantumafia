@@ -12,7 +12,7 @@ def check_targets():
 					
 	parser.add_argument('night', type=int, help="Indicates which game night (1, 2, 3...) to check targets for.")
 	parser.add_argument('player', type=qm_shared.single_letter, help="Indicates which player (A, B, C, D...) needs their actions checked.")
-	parser.add_argument('actions', help="A string of actions for the target player, in the order [scum][detective][entangler][follower][guard]. Sample: EMBLJ")
+	parser.add_argument('actions', help="A string of actions for the target player, in the order [scum][detective][entangler][follower][guard]. Sample: EMBLJ. Skip actions for players who have flipped as power roles.")
 	args = parser.parse_args()
 	
 	#further arg parsing will be required - but first, load game info
@@ -110,15 +110,14 @@ def check_targets():
 	if has_detective_right_now:
 		detective_request = aa_upper[detective_index]
 		
-	#if has_follower_right_now:
-	#	follower_request = aa_upper[follower_index]
+	if has_follower_right_now:
+		follower_request = aa_upper[follower_index]
 	
 	if has_guard_right_now:
 		guard_request = aa_upper[guard_index]
 	
-	#note that we go out a level here
-	#if has_entangler_right_now:	
-	#	entangler_request = aa_upper[entangler_index]	
+	if has_entangler_right_now:	
+		entangler_request = aa_upper[entangler_index]	
 				
 	#Step 0B - track targets
 	#scan through the universe list and make sure that (for each nightkill, detective, or guard) their target is alive in at least one universe (and, for nightkill, alive and not scum)
@@ -131,17 +130,30 @@ def check_targets():
 	universe_file.readline()
 
 	targets_to_check = 0
+	validate_block = {}
 	target_block = {}
 	if nightkill_request != '#':
 		target_block['A'] = nightkill_request
+		validate_block['A'] = True
 		targets_to_check += 1
 	if has_detective_right_now and detective_request != '#':
 		target_block['D'] = detective_request
+		validate_block['D'] = True
+		targets_to_check += 1
+	if has_entangler_right_now and entangler_request != '#':
+		target_block['E'] = None #
+		validate_block['E'] = True
+		targets_to_check += 1
+	if has_follower_right_now and follower_request != '#':
+		target_block['F'] = None
+		validate_block['F'] = True
 		targets_to_check += 1
 	if has_guard_right_now and guard_request != '#':
 		target_block['G'] = guard_request
+		validate_block['G'] = True
 		targets_to_check += 1
 
+	validates_to_check = targets_to_check
 	#now go universe by universe
 	for _ in range(num_universes):
 		if targets_to_check <= 0:
@@ -150,10 +162,32 @@ def check_targets():
 		next_universe = qm_shared.parse_universe(universe_file.readline())[1] #get second half of universe - the part with the letters	
 		#check scum
 		role_index = next_universe[active_player_idx]
-		if role_index in target_block and next_universe[qm_shared.player_to_pos(target_block[role_index])] not in 'XV': #i.e. if not dead, or voted out...
-			del target_block[role_index]
-			targets_to_check -= 1
+		if role_index in target_block:
+			if role_index in validate_block:
+				del validate_block[role_index]
+				validates_to_check -= 1
+			if role_index not in 'ADG':
+				del target_block[role_index]
+				targets_to_check -= 1
+				continue
+			if next_universe[qm_shared.player_to_pos(target_block[role_index])] not in 'XV': #i.e. if not dead, or voted out...
+				del target_block[role_index]
+				targets_to_check -= 1
 	
+	if validates_to_check > 0:
+		print("This player has an one or more actions for which they are not alive in any universe. They are:")
+		if 'A' in validate_block:
+			print("* Nightkill (alpha scum)")
+		if 'D' in validate_block:
+			print("* Investigation (detective)")
+		if 'E' in validate_block:
+			print("* Entanglement")
+		if 'F' in validate_block:
+			print("* Follow")
+		if 'G' in validate_block:
+			print("* Guard")
+		exit()
+		
 	if targets_to_check > 0:
 		print("This player is targeting other players who are dead in every universe where this player holds a role. They are:")
 		for (key, value) in target_block.items():
