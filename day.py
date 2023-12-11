@@ -114,6 +114,13 @@ def day():
 	updated_liveness = qm_shared.transform_liveness_roles(output_buffer, updated_liveness)
 	qm_shared.close_universe_file()
 
+	try:
+		input("Press ENTER to write results to a file.")
+	except (KeyboardInterrupt, EOFError):
+		print()
+		print("Goodbye!")
+		exit()
+	
 	#we also need to update current_setup.
 	new_setup = [0, num_scum, has_detective_right_now, has_entangler_right_now, has_follower_right_now, has_guard_right_now]
 	for player in updated_liveness:

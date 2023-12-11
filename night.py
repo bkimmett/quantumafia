@@ -269,7 +269,7 @@ def night():
 			if has_detective_right_now and 'D' in universe:
 				thisuni_det_index = universe.index('D')
 				det_target_index = qm_shared.player_to_pos(player_action_blocs[thisuni_det_index][detective_index])
-				if guard_target_index ==  det_target_index:
+				if has_guard_right_now and guard_target_index ==  det_target_index:
 					guard_blocking_det = True
 
 			if scum_target_role in 'DFGTX': #we are assuming the guard cannot guard themself in the overall game rules, but we don't check for it anywhere in this program. You'll need to filter for it before entering actions into this program.

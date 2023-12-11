@@ -567,7 +567,7 @@ def print_dms():
 			
 			elif num_universes == 1:
 				if num_universes_disappeared > 0:
-					print(f"**Last night, {num_universes_disappeared:,} universes collapsed. One universe remains:**")
+					print(f"Last night, {num_universes_disappeared:,} universes collapsed. One universe remains:")
 				else:
 					print("A single universe remains.")
 				#don't track dead in this case, they're alive in THIS universe and that's what matters
@@ -646,7 +646,7 @@ def print_dms():
 					print(tab()+follower_result)
 			else:
 				if num_universes_disappeared > 0:
-					print(f"**Last night, {num_universes_disappeared:,} universes collapsed. In the other {num_universes:,}:**")
+					print(f"Last night, {num_universes_disappeared:,} universes collapsed. In the other {num_universes:,}:")
 				else:
 					print(f"No universes collapsed last night. {num_universes:,} universes remain.")
 				print()
@@ -674,7 +674,10 @@ def print_dms():
 				if sum(player_counts[2]) > 0:
 					total_scum = sum(player_counts[2])
 					alpha_scum = player_counts[2][0]
-					print(f'As **scum**, you are alive in {percent(total_scum, num_universes)} universe{plural(total_scum)}, and **alpha scum** in {percent(alpha_scum, num_universes) if alpha_scum > 0 else "none"}.')
+					if num_scum_left == 1:
+						print(f'As **alpha scum**, you are alive in {percent(total_scum, num_universes)} universe{plural(total_scum)}.')
+					else:
+						print(f'As **scum**, you are alive in {percent(total_scum, num_universes)} universe{plural(total_scum)}, and **alpha scum** in {percent(alpha_scum, num_universes) if alpha_scum > 0 else "none"}.')
 					if alpha_scum > 0:
 						num_results = len([x for x in player_results[0] if x > 0]) 
 						nk_target = qm_shared.get_player_name(nightkill_requests[player_idx])
@@ -700,7 +703,7 @@ def print_dms():
 							if player_results[0][1] > 0:
 								scum_outcome += f' {nk_target} **was already dead** when you got there in {percent(player_results[0][1], alpha_scum, square_brackets=True)}{" more" if num_results < 3 else ""} universe{plural(player_results[0][1])}.'
 						print(tab()+scum_outcome)
-						print()
+					print()
 						
 						#you successfully killed {}. #//say # of universes
 						#you tried to kill {}, but were fought off by the guard. #//say # of universes
@@ -776,10 +779,13 @@ def print_dms():
 					print()
 
 				if follower_results[player_idx] is not None:
-					follower_target = qm_shared.get_player_name(follower_requests[player_idx])
+					follower_target = "you" if follower_requests[player_idx] == player_idx else qm_shared.get_player_name(follower_requests[player_idx])
 					if len(follower_results[player_idx]) > 0:
 						#X, Y, Z, and/or A visited {} last night, in _some_ universe.
-						follower_result = f'**{qm_shared.oxford_comma([qm_shared.get_player_name(player) for player in follower_results[player_idx]], "and")} {"all " if len(follower_results[player_idx]) > 1 else ""}visited {follower_target} last night**, {"each visiting " if len(follower_results[player_idx]) > 1 else ""}in _some_ surviving universe.'
+						if player_idx in follower_results[player_idx]:
+							follower_results[player_idx].remove(player_idx)
+							follower_results[player_idx].insert(0, player_idx)
+						follower_result = f'**{qm_shared.oxford_comma([qm_shared.get_player_name(player) if player != player_idx else "You" for player in follower_results[player_idx]], "and")} {"all " if len(follower_results[player_idx]) > 1 else ""}visited {follower_target} last night**, {"each visiting " if len(follower_results[player_idx]) > 1 else ""}in _some_ surviving universe.'
 					else:
 						follower_result = f"**No one visited {follower_target} last night**, in any surviving universe."
 					
@@ -926,7 +932,10 @@ def print_dms():
 				if sum(player_counts[1]) > 0: #scum
 					total_scum = sum(player_counts[1])
 					alpha_scum = player_counts[1][0]
-					print(f'As **scum**, you are alive in {percent(total_scum, num_universes)} universe{plural(total_scum)}, and **alpha scum** in {percent(alpha_scum, num_universes) if alpha_scum > 0 else "none"}.')
+					if num_scum_left == 1:
+						print(f'As **alpha scum**, you are alive in {percent(total_scum, num_universes)} universe{plural(total_scum)}.')
+					else:
+						print(f'As **scum**, you are alive in {percent(total_scum, num_universes)} universe{plural(total_scum)}, and **alpha scum** in {percent(alpha_scum, num_universes) if alpha_scum > 0 else "none"}.')
 					if alpha_scum > 0 and args.num > 0:
 						night_actions.append("**Please choose someone to nightkill.**")
 				else:
